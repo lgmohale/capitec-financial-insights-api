@@ -1,0 +1,1 @@
+# capitec-financial-insights-api
