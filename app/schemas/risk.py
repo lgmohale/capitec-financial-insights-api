@@ -23,7 +23,7 @@ class RiskResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "account_uuid": "550e8400-e29b-41d4-a716-446655440000",
+                "account_id": "550e8400-e29b-41d4-a716-446655440000",
                 "cached": False,
                 "risk_score": 45,
                 "risk_band": "MEDIUM_RISK",
@@ -49,7 +49,7 @@ class RiskResponse(BaseModel):
         }
     )
 
-    account_uuid: UUID
+    account_id: UUID
     cached: bool
     risk_score: int
     risk_band: RiskBand

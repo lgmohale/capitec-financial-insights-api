@@ -7,7 +7,7 @@ class RecommendationsResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "account_uuid": "550e8400-e29b-41d4-a716-446655440000",
+                "account_id": "550e8400-e29b-41d4-a716-446655440000",
                 "cached": False,
                 "financial_health_score": 70,
                 "recommendations": [
@@ -28,7 +28,7 @@ class RecommendationsResponse(BaseModel):
         }
     )
 
-    account_uuid: UUID
+    account_id: UUID
     cached: bool
     financial_health_score: int
     recommendations: list[str]

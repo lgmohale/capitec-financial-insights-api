@@ -3,7 +3,7 @@ from uuid import UUID
 
 from app.services import aggregation_service, categorisation_service, risk_service
 
-ACCOUNT_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
+ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
 def test_score_account_risk_builds_explainable_result_and_cache(
@@ -13,7 +13,7 @@ def test_score_account_risk_builds_explainable_result_and_cache(
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
     input_dir.mkdir()
-    input_file = input_dir / f"{ACCOUNT_UUID}.json"
+    input_file = input_dir / f"{ACCOUNT_ID}.json"
     input_file.write_text(
         json.dumps(
             [
@@ -69,7 +69,7 @@ def test_score_account_risk_builds_explainable_result_and_cache(
         lambda key, value: cached_values.update({key: value}),
     )
 
-    response = risk_service.score_account_risk(ACCOUNT_UUID)
+    response = risk_service.score_account_risk(ACCOUNT_ID)
 
     assert response.cached is False
     assert response.risk_score == 45
@@ -82,9 +82,9 @@ def test_score_account_risk_builds_explainable_result_and_cache(
     assert "Debt repayments exceed 40% of monthly income." in (
         response.risk_factors.triggered_rules
     )
-    assert cached_values[f"risk:{ACCOUNT_UUID}"]["cached"] is False
+    assert cached_values[f"risk:{ACCOUNT_ID}"]["cached"] is False
 
-    output_file = output_dir / f"{ACCOUNT_UUID}_risk.json"
+    output_file = output_dir / f"{ACCOUNT_ID}_risk.json"
     assert response.output_file_path == str(output_file)
     assert output_file.exists()
 
@@ -94,7 +94,7 @@ def test_score_account_risk_returns_cached_result(monkeypatch) -> None:
         risk_service,
         "get_cache",
         lambda key: {
-            "account_uuid": str(ACCOUNT_UUID),
+            "account_id": str(ACCOUNT_ID),
             "cached": False,
             "risk_score": 80,
             "risk_band": "HIGH_RISK",
@@ -115,7 +115,7 @@ def test_score_account_risk_returns_cached_result(monkeypatch) -> None:
         },
     )
 
-    response = risk_service.score_account_risk(ACCOUNT_UUID)
+    response = risk_service.score_account_risk(ACCOUNT_ID)
 
     assert response.cached is True
     assert response.risk_score == 80

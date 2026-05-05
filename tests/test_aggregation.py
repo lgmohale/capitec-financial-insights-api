@@ -3,7 +3,7 @@ from uuid import UUID
 
 from app.services import aggregation_service, categorisation_service
 
-ACCOUNT_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
+ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
 def test_aggregate_account_transactions_builds_output_and_cache(
@@ -13,7 +13,7 @@ def test_aggregate_account_transactions_builds_output_and_cache(
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
     input_dir.mkdir()
-    input_file = input_dir / f"{ACCOUNT_UUID}.json"
+    input_file = input_dir / f"{ACCOUNT_ID}.json"
     input_file.write_text(
         json.dumps(
             [
@@ -52,7 +52,7 @@ def test_aggregate_account_transactions_builds_output_and_cache(
         lambda key, value: cached_values.update({key: value}),
     )
 
-    response = aggregation_service.aggregate_account_transactions(ACCOUNT_UUID)
+    response = aggregation_service.aggregate_account_transactions(ACCOUNT_ID)
 
     assert response.cached is False
     assert response.total_income == 46579.0
@@ -63,9 +63,9 @@ def test_aggregate_account_transactions_builds_output_and_cache(
     assert response.category_breakdown["salary"].transaction_count == 1
     assert response.category_breakdown["groceries"].expenses == 1240.5
     assert response.monthly_summary["2026-04"].transaction_count == 2
-    assert cached_values[f"aggregation:{ACCOUNT_UUID}"]["cached"] is False
+    assert cached_values[f"aggregation:{ACCOUNT_ID}"]["cached"] is False
 
-    output_file = output_dir / f"{ACCOUNT_UUID}_aggregation.json"
+    output_file = output_dir / f"{ACCOUNT_ID}_aggregation.json"
     assert response.output_file_path == str(output_file)
     assert output_file.exists()
 
@@ -75,7 +75,7 @@ def test_aggregate_account_transactions_returns_cached_result(monkeypatch) -> No
         aggregation_service,
         "get_cache",
         lambda key: {
-            "account_uuid": str(ACCOUNT_UUID),
+            "account_id": str(ACCOUNT_ID),
             "cached": False,
             "total_income": 100.0,
             "total_expenses": 25.0,
@@ -101,7 +101,7 @@ def test_aggregate_account_transactions_returns_cached_result(monkeypatch) -> No
         },
     )
 
-    response = aggregation_service.aggregate_account_transactions(ACCOUNT_UUID)
+    response = aggregation_service.aggregate_account_transactions(ACCOUNT_ID)
 
     assert response.cached is True
     assert response.total_income == 100.0

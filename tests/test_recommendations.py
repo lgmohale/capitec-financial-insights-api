@@ -2,7 +2,7 @@ from uuid import UUID
 
 from app.services import recommendation_service
 
-ACCOUNT_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
+ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
 def test_build_account_recommendations_creates_output_and_cache(
@@ -22,9 +22,9 @@ def test_build_account_recommendations_creates_output_and_cache(
     monkeypatch.setattr(
         recommendation_service,
         "aggregate_account_transactions",
-        lambda account_uuid, force_refresh=False: FakeModel(
+        lambda account_id, force_refresh=False: FakeModel(
             {
-                "account_uuid": str(account_uuid),
+                "account_id": str(account_id),
                 "cached": False,
                 "total_income": 10000.0,
                 "total_expenses": 8000.0,
@@ -51,9 +51,9 @@ def test_build_account_recommendations_creates_output_and_cache(
     monkeypatch.setattr(
         recommendation_service,
         "score_account_risk",
-        lambda account_uuid, force_refresh=False: FakeModel(
+        lambda account_id, force_refresh=False: FakeModel(
             {
-                "account_uuid": str(account_uuid),
+                "account_id": str(account_id),
                 "cached": False,
                 "risk_score": 45,
                 "risk_band": "MEDIUM_RISK",
@@ -75,7 +75,7 @@ def test_build_account_recommendations_creates_output_and_cache(
         ),
     )
 
-    response = recommendation_service.build_account_recommendations(ACCOUNT_UUID)
+    response = recommendation_service.build_account_recommendations(ACCOUNT_ID)
 
     assert response.cached is False
     assert response.financial_health_score == 35
@@ -85,9 +85,9 @@ def test_build_account_recommendations_creates_output_and_cache(
     assert "Expenses are above 70% of income." in response.recommendations
     assert "Salary appears consistent." in response.positive_observations
     assert "Cashflow is positive." in response.positive_observations
-    assert cached_values[f"recommendations:{ACCOUNT_UUID}"]["cached"] is False
+    assert cached_values[f"recommendations:{ACCOUNT_ID}"]["cached"] is False
 
-    output_file = output_dir / f"{ACCOUNT_UUID}_recommendations.json"
+    output_file = output_dir / f"{ACCOUNT_ID}_recommendations.json"
     assert response.output_file_path == str(output_file)
     assert output_file.exists()
 
@@ -97,7 +97,7 @@ def test_build_account_recommendations_returns_cached_result(monkeypatch) -> Non
         recommendation_service,
         "get_cache",
         lambda key: {
-            "account_uuid": str(ACCOUNT_UUID),
+            "account_id": str(ACCOUNT_ID),
             "cached": False,
             "financial_health_score": 82,
             "recommendations": ["Build emergency savings."],
@@ -107,7 +107,7 @@ def test_build_account_recommendations_returns_cached_result(monkeypatch) -> Non
         },
     )
 
-    response = recommendation_service.build_account_recommendations(ACCOUNT_UUID)
+    response = recommendation_service.build_account_recommendations(ACCOUNT_ID)
 
     assert response.cached is True
     assert response.financial_health_score == 82

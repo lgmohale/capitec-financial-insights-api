@@ -59,21 +59,23 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         )
         assert link_response.status_code == 201
         link_payload = link_response.json()
-        account_uuid = link_payload["linked_account"]["uuid"]
+        account_id = link_payload["linked_account"]["id"]
         assert link_payload["user"]["name"] == "Lucas George"
         assert link_payload["linked_account"]["bank_name"] == "Capitec"
-        assert (input_dir / f"{account_uuid}.json").exists()
+        assert (input_dir / f"{account_id}.json").exists()
 
-        categories_response = client.get(f"/api/v1/accounts/{account_uuid}/categories")
+        categories_response = client.get(f"/api/v1/accounts/{account_id}/categories")
         assert categories_response.status_code == 200
         categories_payload = categories_response.json()
         assert categories_payload["cached"] is False
-        assert categories_payload["category_summary"]["salary"] >= 1
+        summary_by_category = {
+            item["category"]: item for item in categories_payload["category_summary"]
+        }
+        assert summary_by_category["salary"]["transaction_count"] >= 1
+        assert summary_by_category["salary"]["month_count"] >= 1
         assert Path(categories_payload["output_file_path"]).exists()
 
-        aggregation_response = client.get(
-            f"/api/v1/accounts/{account_uuid}/aggregation"
-        )
+        aggregation_response = client.get(f"/api/v1/accounts/{account_id}/aggregation")
         assert aggregation_response.status_code == 200
         aggregation_payload = aggregation_response.json()
         assert aggregation_payload["cached"] is False
@@ -83,7 +85,7 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert aggregation_payload["month_count"] >= 4
         assert Path(aggregation_payload["output_file_path"]).exists()
 
-        risk_response = client.get(f"/api/v1/accounts/{account_uuid}/risk")
+        risk_response = client.get(f"/api/v1/accounts/{account_id}/risk")
         assert risk_response.status_code == 200
         risk_payload = risk_response.json()
         assert risk_payload["cached"] is False
@@ -91,7 +93,7 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert Path(risk_payload["output_file_path"]).exists()
 
         recommendations_response = client.get(
-            f"/api/v1/accounts/{account_uuid}/recommendations"
+            f"/api/v1/accounts/{account_id}/recommendations"
         )
         assert recommendations_response.status_code == 200
         recommendations_payload = recommendations_response.json()
@@ -100,13 +102,13 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert Path(recommendations_payload["output_file_path"]).exists()
 
         insights_response = client.get(
-            f"/api/v1/accounts/{account_uuid}/financial-insights"
+            f"/api/v1/accounts/{account_id}/financial-insights"
         )
         assert insights_response.status_code == 200
         insights_payload = insights_response.json()
-        assert insights_payload["account_uuid"] == account_uuid
+        assert insights_payload["account_id"] == account_id
         assert insights_payload["user"]["name"] == "Lucas George"
-        assert insights_payload["linked_account"]["uuid"] == account_uuid
+        assert insights_payload["linked_account"]["id"] == account_id
         assert insights_payload["aggregation"]["cached"] is True
         assert insights_payload["risk"]["cached"] is True
         assert insights_payload["recommendations"]["cached"] is True

@@ -83,9 +83,9 @@ CREDIT_TEMPLATES = [
 ]
 
 
-def write_starter_transactions(linked_account_uuid: UUID) -> Path:
+def write_starter_transactions(linked_account_id: UUID) -> Path:
     INPUT_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = INPUT_DIR / f"{linked_account_uuid}.json"
+    file_path = INPUT_DIR / f"{linked_account_id}.json"
     transactions = generate_random_transaction_history()
     file_path.write_text(
         json.dumps(transactions, indent=2) + "\n",

@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/v1/accounts", tags=["financial insights"])
 
 
 @router.get(
-    "/{account_uuid}/financial-insights",
+    "/{account_id}/financial-insights",
     response_model=FinancialInsightsResponse,
     summary="Get combined financial insights",
     description=(
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1/accounts", tags=["financial insights"])
     ),
 )
 def get_financial_insights(
-    account_uuid: UUID,
+    account_id: UUID,
     db: Annotated[Session, Depends(get_db)],
 ) -> FinancialInsightsResponse:
-    return build_financial_insights(account_uuid=account_uuid, db=db)
+    return build_financial_insights(account_id=account_id, db=db)

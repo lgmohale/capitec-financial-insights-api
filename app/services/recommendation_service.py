@@ -10,10 +10,10 @@ from app.storage.transactions import OUTPUT_DIR
 
 
 def build_account_recommendations(
-    account_uuid: UUID,
+    account_id: UUID,
     force_refresh: bool = False,
 ) -> RecommendationsResponse:
-    cache_key = f"recommendations:{account_uuid}"
+    cache_key = f"recommendations:{account_id}"
     if not force_refresh:
         cached_result = get_cache(cache_key)
         if cached_result is not None:
@@ -21,20 +21,20 @@ def build_account_recommendations(
             return RecommendationsResponse(**cached_result)
 
     aggregation = aggregate_account_transactions(
-        account_uuid=account_uuid,
+        account_id=account_id,
         force_refresh=force_refresh,
     )
-    risk = score_account_risk(account_uuid=account_uuid, force_refresh=force_refresh)
+    risk = score_account_risk(account_id=account_id, force_refresh=force_refresh)
     recommendation_result = build_recommendation_result(
         aggregation=aggregation.model_dump(mode="json"),
         risk=risk.model_dump(mode="json"),
     )
     output_file_path = write_recommendations_output(
-        account_uuid,
+        account_id,
         recommendation_result,
     )
     result = RecommendationsResponse(
-        account_uuid=account_uuid,
+        account_id=account_id,
         cached=False,
         output_file_path=str(output_file_path),
         **recommendation_result,
@@ -166,15 +166,15 @@ def safe_ratio(numerator: float, denominator: float) -> float:
 
 
 def write_recommendations_output(
-    account_uuid: UUID,
+    account_id: UUID,
     recommendation_result: dict,
 ) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_file_path = OUTPUT_DIR / f"{account_uuid}_recommendations.json"
+    output_file_path = OUTPUT_DIR / f"{account_id}_recommendations.json"
     output_file_path.write_text(
         json.dumps(
             {
-                "account_uuid": str(account_uuid),
+                "account_id": str(account_id),
                 **recommendation_result,
             },
             indent=2,

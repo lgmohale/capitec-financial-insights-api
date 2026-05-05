@@ -13,21 +13,21 @@ from app.storage.transactions import OUTPUT_DIR
 
 
 def aggregate_account_transactions(
-    account_uuid: UUID,
+    account_id: UUID,
     force_refresh: bool = False,
 ) -> AggregationResponse:
-    cache_key = f"aggregation:{account_uuid}"
+    cache_key = f"aggregation:{account_id}"
     if not force_refresh:
         cached_result = get_cache(cache_key)
         if cached_result is not None:
             cached_result["cached"] = True
             return AggregationResponse(**cached_result)
 
-    transactions = read_transactions(account_uuid)
+    transactions = read_transactions(account_id)
     aggregation = build_aggregation(transactions)
-    output_file_path = write_aggregation_output(account_uuid, aggregation)
+    output_file_path = write_aggregation_output(account_id, aggregation)
     result = AggregationResponse(
-        account_uuid=account_uuid,
+        account_id=account_id,
         cached=False,
         output_file_path=str(output_file_path),
         **aggregation,
@@ -86,13 +86,13 @@ def build_aggregation(transactions: list[dict]) -> dict:
     }
 
 
-def write_aggregation_output(account_uuid: UUID, aggregation: dict) -> Path:
+def write_aggregation_output(account_id: UUID, aggregation: dict) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_file_path = OUTPUT_DIR / f"{account_uuid}_aggregation.json"
+    output_file_path = OUTPUT_DIR / f"{account_id}_aggregation.json"
     output_file_path.write_text(
         json.dumps(
             {
-                "account_uuid": str(account_uuid),
+                "account_id": str(account_id),
                 **aggregation,
             },
             indent=2,

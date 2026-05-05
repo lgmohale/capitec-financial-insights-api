@@ -13,25 +13,25 @@ from app.storage.transactions import OUTPUT_DIR
 
 
 def score_account_risk(
-    account_uuid: UUID,
+    account_id: UUID,
     force_refresh: bool = False,
 ) -> RiskResponse:
-    cache_key = f"risk:{account_uuid}"
+    cache_key = f"risk:{account_id}"
     if not force_refresh:
         cached_result = get_cache(cache_key)
         if cached_result is not None:
             cached_result["cached"] = True
             return RiskResponse(**cached_result)
 
-    transactions = read_transactions(account_uuid)
+    transactions = read_transactions(account_id)
     aggregation = aggregate_account_transactions(
-        account_uuid=account_uuid,
+        account_id=account_id,
         force_refresh=force_refresh,
     )
     risk_result = build_risk_result(transactions, aggregation.model_dump(mode="json"))
-    output_file_path = write_risk_output(account_uuid, risk_result)
+    output_file_path = write_risk_output(account_id, risk_result)
     result = RiskResponse(
-        account_uuid=account_uuid,
+        account_id=account_id,
         cached=False,
         output_file_path=str(output_file_path),
         **risk_result,
@@ -201,13 +201,13 @@ def get_recommendation(risk_score: int) -> str:
     return "Low lending risk based on available transaction behaviour."
 
 
-def write_risk_output(account_uuid: UUID, risk_result: dict) -> Path:
+def write_risk_output(account_id: UUID, risk_result: dict) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_file_path = OUTPUT_DIR / f"{account_uuid}_risk.json"
+    output_file_path = OUTPUT_DIR / f"{account_id}_risk.json"
     output_file_path.write_text(
         json.dumps(
             {
-                "account_uuid": str(account_uuid),
+                "account_id": str(account_id),
                 **risk_result,
             },
             indent=2,
