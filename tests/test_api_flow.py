@@ -75,9 +75,7 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert summary_by_category["salary"]["month_count"] >= 1
         assert Path(categories_payload["output_file_path"]).exists()
 
-        aggregation_response = client.get(
-            f"/api/v1/accounts/{account_id}/aggregation"
-        )
+        aggregation_response = client.get(f"/api/v1/accounts/{account_id}/aggregation")
         assert aggregation_response.status_code == 200
         aggregation_payload = aggregation_response.json()
         assert aggregation_payload["cached"] is False

@@ -53,9 +53,7 @@ def test_categorise_account_transactions_builds_output_and_cache(
     )
 
     response = categorisation_service.categorise_account_transactions(ACCOUNT_ID)
-    summary_by_category = {
-        item.category: item for item in response.category_summary
-    }
+    summary_by_category = {item.category: item for item in response.category_summary}
 
     assert response.cached is False
     assert summary_by_category["salary"].transaction_count == 1
