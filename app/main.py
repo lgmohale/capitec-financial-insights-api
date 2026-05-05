@@ -13,8 +13,9 @@ app = FastAPI(
     version="0.1.0",
     description=(
         "FastAPI backend for simulated bank account linking, metadata-only "
-        "PostgreSQL storage, local S3-style transaction files, Redis-backed "
-        "insight caching, and rule-based financial insights."
+        "PostgreSQL storage, MinIO PDF statement uploads, local S3-style "
+        "transaction files, Redis-backed insight caching, and rule-based "
+        "financial insights."
     ),
     contact={"name": "Capitec Financial Insights API Submission"},
     openapi_tags=[
@@ -24,7 +25,10 @@ app = FastAPI(
         },
         {
             "name": "bank accounts",
-            "description": "Simulated bank account linking and metadata creation.",
+            "description": (
+                "Simulated bank account linking, PDF statement uploads, and "
+                "metadata creation."
+            ),
         },
         {
             "name": "categories",

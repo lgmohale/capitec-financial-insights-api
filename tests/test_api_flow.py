@@ -2,17 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from pathlib import Path
+from uuid import UUID
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.dependencies import get_db
-from app.db.models import Base
+from app.db.models import BankStatement, Base
 from app.main import app
 from app.services import (
     aggregation_service,
+    bank_statement_service,
     categorisation_service,
     recommendation_service,
     risk_service,
@@ -25,6 +27,13 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
     output_dir = tmp_path / "data" / "output"
     configure_temp_storage(monkeypatch, input_dir, output_dir)
     configure_fake_cache(monkeypatch)
+    monkeypatch.setattr(
+        bank_statement_service,
+        "upload_statement_pdf",
+        lambda user_id, statement_id, file, content: (
+            f"bank-statements/{user_id}/{statement_id}.pdf"
+        ),
+    )
 
     engine = create_engine(
         "sqlite://",
@@ -63,6 +72,41 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert link_payload["user"]["name"] == "Lucas George"
         assert link_payload["linked_account"]["bank_name"] == "Capitec"
         assert (input_dir / f"{account_id}.json").exists()
+
+        upload_response = client.post(
+            "/api/v1/bank-accounts/statement-upload",
+            data={"user_names": "Mia George", "bank_name": "FNB Statement April 2026"},
+            files={
+                "file": (
+                    "statement.pdf",
+                    b"%PDF-1.4 simulated statement",
+                    "application/pdf",
+                )
+            },
+        )
+        assert upload_response.status_code == 201
+        upload_payload = upload_response.json()
+        uploaded_account_id = upload_payload["id"]
+        assert upload_payload["user_id"]
+        assert upload_payload["bank_name"] == "FNB Statement April 2026"
+        assert upload_payload["file_url"] == (
+            f"bank-statements/{upload_payload['user_id']}/{uploaded_account_id}.pdf"
+        )
+        assert upload_payload["message"] == (
+            "Bank statement uploaded successfully and queued for processing."
+        )
+        assert "transaction_file_path" not in upload_payload
+        assert (input_dir / f"{uploaded_account_id}.json").exists()
+        with testing_session_local() as db:
+            bank_statement = db.scalar(
+                select(BankStatement).where(
+                    BankStatement.id == UUID(uploaded_account_id)
+                )
+            )
+        assert bank_statement is not None
+        assert str(bank_statement.user_id) == upload_payload["user_id"]
+        assert bank_statement.bank_name == "FNB Statement April 2026"
+        assert bank_statement.file_url == upload_payload["file_url"]
 
         categories_response = client.get(f"/api/v1/accounts/{account_id}/categories")
         assert categories_response.status_code == 200
