@@ -222,6 +222,23 @@ docker compose exec api ruff format --check .
 
 The API flow tests use temporary data folders, a test database, and fake cache hooks. They do not depend on existing local JSON files or a running Redis service.
 
+## Git Hooks
+
+Install pre-commit hooks on the host machine:
+
+```bash
+pre-commit install
+pre-commit install --hook-type pre-push
+```
+
+The pre-push hook runs:
+
+```bash
+docker compose run --rm api pytest
+```
+
+If tests fail, `git push` is blocked. Keep Docker running before pushing.
+
 ## Assumptions
 
 - Bank linking is simulated and does not call a real banking API.
