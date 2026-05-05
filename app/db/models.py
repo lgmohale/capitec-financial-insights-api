@@ -51,3 +51,25 @@ class LinkedAccount(Base):
         nullable=False,
         server_default=func.now(),
     )
+
+
+class BankStatement(Base):
+    __tablename__ = "bank_statement"
+
+    id: Mapped[PythonUUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    user_id: Mapped[PythonUUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+    bank_name: Mapped[str] = mapped_column(String, nullable=False)
+    file_url: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )

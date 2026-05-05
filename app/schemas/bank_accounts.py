@@ -79,3 +79,29 @@ class LinkBankAccountResponse(BaseModel):
 
     user: UserMetadata
     linked_account: LinkedAccountMetadata
+
+
+class UploadStatementResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "user_id": "650e8400-e29b-41d4-a716-446655440000",
+                "bank_name": "FNB Statement April 2026",
+                "file_url": (
+                    "bank-statements/650e8400-e29b-41d4-a716-446655440000/"
+                    "550e8400-e29b-41d4-a716-446655440000.pdf"
+                ),
+                "message": (
+                    "Bank statement uploaded successfully and queued for processing."
+                ),
+            }
+        },
+    )
+
+    id: UUID
+    user_id: UUID
+    bank_name: str
+    file_url: str
+    message: str
