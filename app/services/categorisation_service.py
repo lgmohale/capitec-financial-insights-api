@@ -41,21 +41,21 @@ CATEGORIES = [
 
 
 def categorise_account_transactions(
-    account_uuid: UUID,
+    account_id: UUID,
     force_refresh: bool = False,
 ) -> CategoriesResponse:
-    cache_key = f"categorisation:{account_uuid}"
+    cache_key = f"categorisation:{account_id}"
     if not force_refresh:
         cached_result = get_cache(cache_key)
         if cached_result is not None:
             cached_result["cached"] = True
             return CategoriesResponse(**cached_result)
 
-    transactions = read_transactions(account_uuid)
+    transactions = read_transactions(account_id)
     category_summary = build_category_summary(transactions)
-    output_file_path = write_category_output(account_uuid, category_summary)
+    output_file_path = write_category_output(account_id, category_summary)
     result = CategoriesResponse(
-        account_uuid=account_uuid,
+        account_id=account_id,
         cached=False,
         category_summary=category_summary,
         output_file_path=str(output_file_path),
@@ -66,8 +66,8 @@ def categorise_account_transactions(
     return result
 
 
-def read_transactions(account_uuid: UUID) -> list[dict]:
-    input_file_path = INPUT_DIR / f"{account_uuid}.json"
+def read_transactions(account_id: UUID) -> list[dict]:
+    input_file_path = INPUT_DIR / f"{account_id}.json"
     if not input_file_path.exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -77,13 +77,33 @@ def read_transactions(account_uuid: UUID) -> list[dict]:
     return json.loads(input_file_path.read_text(encoding="utf-8"))
 
 
-def build_category_summary(transactions: list[dict]) -> dict[str, int]:
-    category_summary = {category: 0 for category in CATEGORIES}
+def build_category_summary(transactions: list[dict]) -> list[dict]:
+    category_summary = {
+        category: {
+            "category": category,
+            "total_amount": 0.0,
+            "transaction_count": 0,
+            "months": set(),
+        }
+        for category in CATEGORIES
+    }
     for transaction in transactions:
         category = categorise_transaction(transaction)
-        category_summary[category] += 1
+        amount = abs(float(transaction.get("amount", 0.0)))
+        month = str(transaction.get("date", ""))[:7]
+        category_summary[category]["total_amount"] += amount
+        category_summary[category]["transaction_count"] += 1
+        category_summary[category]["months"].add(month)
 
-    return category_summary
+    return [
+        {
+            "category": values["category"],
+            "total_amount": round(values["total_amount"], 2),
+            "transaction_count": values["transaction_count"],
+            "month_count": len(values["months"]),
+        }
+        for values in category_summary.values()
+    ]
 
 
 def categorise_transaction(transaction: dict) -> str:
@@ -102,15 +122,15 @@ def categorise_transaction(transaction: dict) -> str:
 
 
 def write_category_output(
-    account_uuid: UUID,
-    category_summary: dict[str, int],
+    account_id: UUID,
+    category_summary: list[dict],
 ) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_file_path = OUTPUT_DIR / f"{account_uuid}_categories.json"
+    output_file_path = OUTPUT_DIR / f"{account_id}_categories.json"
     output_file_path.write_text(
         json.dumps(
             {
-                "account_uuid": str(account_uuid),
+                "account_id": str(account_id),
                 "category_summary": category_summary,
             },
             indent=2,

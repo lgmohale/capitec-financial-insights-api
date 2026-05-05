@@ -50,12 +50,12 @@ def test_link_bank_account_creates_metadata_and_transaction_file(
     assert len(db.added) == 2
     assert response.user.name == "Lucas George"
     assert response.linked_account.bank_name == "Capitec"
-    assert response.linked_account.user_id == response.user.uuid
+    assert response.linked_account.user_id == response.user.id
 
-    linked_account_uuid = response.linked_account.uuid
-    transaction_file = input_dir / f"{linked_account_uuid}.json"
+    linked_account_id = response.linked_account.id
+    transaction_file = input_dir / f"{linked_account_id}.json"
 
-    assert isinstance(linked_account_uuid, UUID)
+    assert isinstance(linked_account_id, UUID)
     assert transaction_file.exists()
 
     created_transactions = json.loads(transaction_file.read_text(encoding="utf-8"))

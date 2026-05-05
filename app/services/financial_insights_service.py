@@ -14,31 +14,31 @@ from app.services.risk_service import score_account_risk
 
 
 def build_financial_insights(
-    account_uuid: UUID,
+    account_id: UUID,
     db: Session,
 ) -> FinancialInsightsResponse:
     linked_account = db.scalar(
-        select(LinkedAccount).where(LinkedAccount.uuid == account_uuid)
+        select(LinkedAccount).where(LinkedAccount.id == account_id)
     )
     if linked_account is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Linked account not found: {account_uuid}",
+            detail=f"Linked account not found: {account_id}",
         )
 
-    user = db.scalar(select(User).where(User.uuid == linked_account.user_id))
+    user = db.scalar(select(User).where(User.id == linked_account.user_id))
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User not found for linked account: {account_uuid}",
+            detail=f"User not found for linked account: {account_id}",
         )
 
-    aggregation = aggregate_account_transactions(account_uuid=account_uuid)
-    risk = score_account_risk(account_uuid=account_uuid)
-    recommendations = build_account_recommendations(account_uuid=account_uuid)
+    aggregation = aggregate_account_transactions(account_id=account_id)
+    risk = score_account_risk(account_id=account_id)
+    recommendations = build_account_recommendations(account_id=account_id)
 
     return FinancialInsightsResponse(
-        account_uuid=account_uuid,
+        account_id=account_id,
         user=UserMetadata.model_validate(user),
         linked_account=LinkedAccountMetadata.model_validate(linked_account),
         aggregation=aggregation,

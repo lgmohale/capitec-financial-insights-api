@@ -23,7 +23,7 @@ class UserMetadata(BaseModel):
         from_attributes=True,
         json_schema_extra={
             "example": {
-                "uuid": "650e8400-e29b-41d4-a716-446655440000",
+                "id": "650e8400-e29b-41d4-a716-446655440000",
                 "name": "Lucas George",
                 "created_at": "2026-05-05T10:00:00Z",
                 "updated_at": "2026-05-05T10:00:00Z",
@@ -31,7 +31,7 @@ class UserMetadata(BaseModel):
         },
     )
 
-    uuid: UUID
+    id: UUID
     name: str
     created_at: datetime
     updated_at: datetime
@@ -43,7 +43,7 @@ class LinkedAccountMetadata(BaseModel):
         json_schema_extra={
             "example": {
                 "user_id": "650e8400-e29b-41d4-a716-446655440000",
-                "uuid": "550e8400-e29b-41d4-a716-446655440000",
+                "id": "550e8400-e29b-41d4-a716-446655440000",
                 "bank_name": "Capitec",
                 "created_at": "2026-05-05T10:00:00Z",
             }
@@ -51,7 +51,7 @@ class LinkedAccountMetadata(BaseModel):
     )
 
     user_id: UUID
-    uuid: UUID
+    id: UUID
     bank_name: str
     created_at: datetime
 
@@ -62,14 +62,14 @@ class LinkBankAccountResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "user": {
-                    "uuid": "650e8400-e29b-41d4-a716-446655440000",
+                    "id": "650e8400-e29b-41d4-a716-446655440000",
                     "name": "Lucas George",
                     "created_at": "2026-05-05T10:00:00Z",
                     "updated_at": "2026-05-05T10:00:00Z",
                 },
                 "linked_account": {
                     "user_id": "650e8400-e29b-41d4-a716-446655440000",
-                    "uuid": "550e8400-e29b-41d4-a716-446655440000",
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
                     "bank_name": "Capitec",
                     "created_at": "2026-05-05T10:00:00Z",
                 },

@@ -9,20 +9,20 @@ from app.schemas.recommendations import RecommendationsResponse
 from app.schemas.risk import RiskResponse
 from app.services import financial_insights_service
 
-ACCOUNT_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
-USER_UUID = UUID("650e8400-e29b-41d4-a716-446655440000")
+ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+USER_ID = UUID("650e8400-e29b-41d4-a716-446655440000")
 
 
 def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
     user = User(
-        uuid=USER_UUID,
+        id=USER_ID,
         name="Lucas George",
         created_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
         updated_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
     )
     linked_account = LinkedAccount(
-        user_id=USER_UUID,
-        uuid=ACCOUNT_UUID,
+        user_id=USER_ID,
+        id=ACCOUNT_ID,
         bank_name="Capitec",
         created_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
     )
@@ -31,8 +31,8 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
     monkeypatch.setattr(
         financial_insights_service,
         "aggregate_account_transactions",
-        lambda account_uuid: AggregationResponse(
-            account_uuid=account_uuid,
+        lambda account_id: AggregationResponse(
+            account_id=account_id,
             cached=True,
             total_income=100.0,
             total_expenses=25.0,
@@ -47,8 +47,8 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
     monkeypatch.setattr(
         financial_insights_service,
         "score_account_risk",
-        lambda account_uuid: RiskResponse(
-            account_uuid=account_uuid,
+        lambda account_id: RiskResponse(
+            account_id=account_id,
             cached=True,
             risk_score=20,
             risk_band="LOW_RISK",
@@ -71,8 +71,8 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
     monkeypatch.setattr(
         financial_insights_service,
         "build_account_recommendations",
-        lambda account_uuid: RecommendationsResponse(
-            account_uuid=account_uuid,
+        lambda account_id: RecommendationsResponse(
+            account_id=account_id,
             cached=True,
             financial_health_score=90,
             recommendations=["Build emergency savings."],
@@ -83,13 +83,13 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
     )
 
     response = financial_insights_service.build_financial_insights(
-        account_uuid=ACCOUNT_UUID,
+        account_id=ACCOUNT_ID,
         db=db,
     )
 
-    assert response.account_uuid == ACCOUNT_UUID
-    assert response.user.uuid == USER_UUID
-    assert response.linked_account.uuid == ACCOUNT_UUID
+    assert response.account_id == ACCOUNT_ID
+    assert response.user.id == USER_ID
+    assert response.linked_account.id == ACCOUNT_ID
     assert response.aggregation.cached is True
     assert response.risk.risk_band == "LOW_RISK"
     assert response.recommendations.financial_health_score == 90

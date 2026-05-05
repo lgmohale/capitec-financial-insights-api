@@ -51,7 +51,7 @@ This design is useful because transaction payloads can be large, schema-flexible
 
 ## Local S3 Folders
 
-- `data/input`: stores raw transaction files using `{linked_account_uuid}.json`
+- `data/input`: stores raw transaction files using `{linked_account_id}.json`
 - `data/output`: stores processed outputs, such as categorisation, aggregation, risk, and recommendation results
 
 Example input file:
@@ -63,10 +63,10 @@ data/input/550e8400-e29b-41d4-a716-446655440000.json
 Example output files:
 
 ```text
-data/output/{account_uuid}_categories.json
-data/output/{account_uuid}_aggregation.json
-data/output/{account_uuid}_risk.json
-data/output/{account_uuid}_recommendations.json
+data/output/{account_id}_categories.json
+data/output/{account_id}_aggregation.json
+data/output/{account_id}_risk.json
+data/output/{account_id}_recommendations.json
 ```
 
 ## PostgreSQL Metadata-Only Design
@@ -79,7 +79,7 @@ PostgreSQL does not store full transactions. It stores only users and linked acc
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `uuid` | UUID | Primary key |
+| `id` | UUID | Primary key |
 | `name` | string | User name |
 | `created_at` | datetime | Creation timestamp |
 | `updated_at` | datetime | Update timestamp |
@@ -88,12 +88,12 @@ PostgreSQL does not store full transactions. It stores only users and linked acc
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `user_id` | UUID | Primary key, foreign key to `users.uuid` |
-| `uuid` | UUID | Transaction file UUID |
+| `user_id` | UUID | Primary key, foreign key to `users.id` |
+| `id` | UUID | Transaction file ID |
 | `bank_name` | string | Linked bank name |
 | `created_at` | datetime | Creation timestamp |
 
-The linked account `uuid` is also the JSON file name in `data/input`.
+The linked account `id` is also the JSON file name in `data/input`.
 
 ## Redis Caching
 
@@ -101,10 +101,10 @@ Redis simulates AWS ElastiCache. Processed results are cached as JSON for 3600 s
 
 Cache keys:
 
-- `categorisation:{account_uuid}`
-- `aggregation:{account_uuid}`
-- `risk:{account_uuid}`
-- `recommendations:{account_uuid}`
+- `categorisation:{account_id}`
+- `aggregation:{account_id}`
+- `risk:{account_id}`
+- `recommendations:{account_id}`
 
 Each processing endpoint supports `force_refresh=false`. Set `force_refresh=true` to bypass Redis and rebuild the result.
 
@@ -114,11 +114,18 @@ Each processing endpoint supports `force_refresh=false`. Set `force_refresh=true
 | --- | --- | --- |
 | `GET` | `/health` | Health check |
 | `POST` | `/api/v1/bank-accounts/link` | Simulate linking a bank account |
-| `GET` | `/api/v1/accounts/{account_uuid}/categories` | Categorise transactions |
-| `GET` | `/api/v1/accounts/{account_uuid}/aggregation` | Aggregate transaction metrics |
-| `GET` | `/api/v1/accounts/{account_uuid}/risk` | Generate lending risk score |
-| `GET` | `/api/v1/accounts/{account_uuid}/recommendations` | Generate financial recommendations |
-| `GET` | `/api/v1/accounts/{account_uuid}/financial-insights` | Return combined insights |
+| `GET` | `/api/v1/accounts/{account_id}/categories` | Categorise transactions |
+| `GET` | `/api/v1/accounts/{account_id}/aggregation` | Aggregate transaction metrics |
+| `GET` | `/api/v1/accounts/{account_id}/risk` | Generate lending risk score |
+| `GET` | `/api/v1/accounts/{account_id}/recommendations` | Generate financial recommendations |
+| `GET` | `/api/v1/accounts/{account_id}/financial-insights` | Return combined insights |
+
+The categories endpoint returns one summary item per category with:
+
+- `category`
+- `total_amount`
+- `transaction_count`
+- `month_count`
 
 ## Example Request and Response
 
@@ -135,14 +142,14 @@ Example response:
 ```json
 {
   "user": {
-    "uuid": "650e8400-e29b-41d4-a716-446655440000",
+    "id": "650e8400-e29b-41d4-a716-446655440000",
     "name": "Lucas George",
     "created_at": "2026-05-05T10:00:00Z",
     "updated_at": "2026-05-05T10:00:00Z"
   },
   "linked_account": {
     "user_id": "650e8400-e29b-41d4-a716-446655440000",
-    "uuid": "550e8400-e29b-41d4-a716-446655440000",
+    "id": "550e8400-e29b-41d4-a716-446655440000",
     "bank_name": "Capitec",
     "created_at": "2026-05-05T10:00:00Z"
   }
@@ -152,12 +159,12 @@ Example response:
 Get combined financial insights:
 
 ```bash
-curl http://127.0.0.1:8000/api/v1/accounts/{account_uuid}/financial-insights
+curl http://127.0.0.1:8000/api/v1/accounts/{account_id}/financial-insights
 ```
 
 Response includes:
 
-- `account_uuid`
+- `account_id`
 - `user`
 - `linked_account`
 - `aggregation`

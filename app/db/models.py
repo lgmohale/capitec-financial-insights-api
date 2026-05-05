@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    uuid: Mapped[PythonUUID] = mapped_column(
+    id: Mapped[PythonUUID] = mapped_column(
         Uuid(as_uuid=True),
         primary_key=True,
         default=uuid4,
@@ -37,10 +37,10 @@ class LinkedAccount(Base):
 
     user_id: Mapped[PythonUUID] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.uuid"),
+        ForeignKey("users.id"),
         primary_key=True,
     )
-    uuid: Mapped[PythonUUID] = mapped_column(
+    id: Mapped[PythonUUID] = mapped_column(
         Uuid(as_uuid=True),
         nullable=False,
         default=uuid4,

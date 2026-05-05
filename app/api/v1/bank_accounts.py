@@ -21,8 +21,8 @@ router = APIRouter(prefix="/api/v1/bank-accounts", tags=["bank accounts"])
     status_code=status.HTTP_201_CREATED,
     summary="Link a simulated bank account",
     description=(
-        "Creates a user metadata row, generates a linked account UUID, writes "
-        "a random transaction history to `data/input/{linked_account_uuid}.json`, "
+        "Creates a user metadata row, generates a linked account ID, writes "
+        "a random transaction history to `data/input/{linked_account_id}.json`, "
         "and stores only linked account metadata in PostgreSQL. Generated histories "
         "cover more than 3 months and include salary, deposits, withdrawals, and "
         "at least 7 transactions per week."
@@ -32,15 +32,15 @@ def link_bank_account(
     request: LinkBankAccountRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> LinkBankAccountResponse:
-    user = User(uuid=uuid4(), name=request.name)
-    linked_account_uuid = uuid4()
+    user = User(id=uuid4(), name=request.name)
+    linked_account_id = uuid4()
     linked_account = LinkedAccount(
-        user_id=user.uuid,
-        uuid=linked_account_uuid,
+        user_id=user.id,
+        id=linked_account_id,
         bank_name=request.bank_name,
     )
 
-    file_path = write_starter_transactions(linked_account_uuid)
+    file_path = write_starter_transactions(linked_account_id)
     try:
         db.add(user)
         db.flush()
