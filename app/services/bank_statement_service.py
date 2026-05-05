@@ -3,10 +3,10 @@ from uuid import UUID, uuid4
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
-from app.db.models import BankStatement
-from app.schemas.bank_accounts import UploadStatementResponse
-from app.services.bank_account_service import create_linked_account
+from app.db.models import BankStatement, User
+from app.schemas.bank_statements import UploadStatementResponse
 from app.storage.statements import upload_statement_pdf
+from app.storage.transactions import write_starter_transactions
 
 SUCCESS_MESSAGE = "Bank statement uploaded successfully and queued for processing."
 
@@ -19,6 +19,7 @@ async def upload_and_process_bank_statement(
 ) -> UploadStatementResponse:
     user_id = uuid4()
     statement_id = uuid4()
+    user = User(id=user_id, name=user_names)
     file_url = upload_statement_pdf(
         user_id=user_id,
         statement_id=statement_id,
@@ -26,20 +27,24 @@ async def upload_and_process_bank_statement(
         content=await file.read(),
     )
 
-    linked_account_response, _ = create_linked_account(
-        name=user_names,
-        bank_name=bank_name,
-        db=db,
+    transaction_file_path = write_starter_transactions(statement_id)
+    bank_statement = BankStatement(
+        id=statement_id,
         user_id=user_id,
-        linked_account_id=statement_id,
-    )
-    bank_statement = save_bank_statement_record(
-        statement_id=linked_account_response.linked_account.id,
-        user_id=linked_account_response.user.id,
         bank_name=bank_name,
         file_url=file_url,
-        db=db,
     )
+    try:
+        db.add(user)
+        db.flush()
+        db.add(bank_statement)
+        db.commit()
+    except Exception:
+        db.rollback()
+        transaction_file_path.unlink(missing_ok=True)
+        raise
+
+    db.refresh(bank_statement)
 
     return UploadStatementResponse(
         id=bank_statement.id,

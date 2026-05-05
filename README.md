@@ -1,19 +1,21 @@
 # Capitec Financial Insights API
 
-FastAPI backend for a transaction aggregation and financial insights system. The API simulates linking a user's bank account, stores raw transaction data as JSON files, stores only account metadata in PostgreSQL, and produces cached financial insights using rule-based processing.
+FastAPI backend for a transaction aggregation and financial insights system. The API accepts PDF bank statement uploads, stores PDFs in MinIO, stores raw generated transaction data as JSON files, stores only metadata in PostgreSQL, and produces cached financial insights using rule-based processing.
 
 ## Project Overview
 
 The system supports a simple financial insights workflow:
 
-1. Link a simulated bank account for a user.
-2. Store the raw transaction payload in local S3-style storage.
-3. Store only user and linked account metadata in PostgreSQL.
-4. Categorise transactions.
-5. Aggregate income, expenses, cashflow, category, and monthly summaries.
-6. Score lending risk using explainable rules.
-7. Generate financial recommendations.
-8. Return a combined financial insights response.
+1. Upload a PDF bank statement for a user.
+2. Store the PDF in MinIO.
+3. Simulate OCR by generating transactions from the uploaded statement.
+4. Store the raw transaction payload in local S3-style storage.
+5. Store only user and bank statement metadata in PostgreSQL.
+6. Categorise transactions.
+7. Aggregate income, expenses, cashflow, category, and monthly summaries.
+8. Score lending risk using explainable rules.
+9. Generate financial recommendations.
+10. Return a combined financial insights response.
 
 ## Architecture
 
@@ -74,7 +76,7 @@ This design is useful because transaction payloads can be large, schema-flexible
 
 ## Local S3 Folders
 
-- `data/input`: stores raw transaction files using `{linked_account_id}.json`
+- `data/input`: stores raw transaction files using `{statement_id}.json`
 - `data/output`: stores processed outputs, such as categorisation, aggregation, risk, and recommendation results
 
 Example input file:
@@ -94,7 +96,7 @@ data/output/{account_id}_recommendations.json
 
 ## PostgreSQL Metadata-Only Design
 
-PostgreSQL does not store full transactions. It stores only users, linked account metadata, and uploaded bank statement metadata.
+PostgreSQL does not store full transactions. It stores only users and uploaded bank statement metadata.
 
 ### Tables
 
@@ -106,17 +108,6 @@ PostgreSQL does not store full transactions. It stores only users, linked accoun
 | `name` | string | User name |
 | `created_at` | datetime | Creation timestamp |
 | `updated_at` | datetime | Update timestamp |
-
-`linked_account`
-
-| Column | Type | Notes |
-| --- | --- | --- |
-| `user_id` | UUID | Primary key, foreign key to `users.id` |
-| `id` | UUID | Transaction file ID |
-| `bank_name` | string | Linked bank name |
-| `created_at` | datetime | Creation timestamp |
-
-The linked account `id` is also the JSON file name in `data/input`.
 
 `bank_statement`
 
@@ -146,8 +137,7 @@ Each processing endpoint supports `force_refresh=false`. Set `force_refresh=true
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/health` | Health check |
-| `POST` | `/api/v1/bank-accounts/link` | Simulate linking a bank account |
-| `POST` | `/api/v1/bank-accounts/statement-upload` | Upload a PDF statement to MinIO and simulate OCR processing |
+| `POST` | `/api/v1/bank-statements/upload` | Upload a PDF statement to MinIO and simulate OCR processing |
 | `GET` | `/api/v1/accounts/{account_id}/categories` | Categorise transactions |
 | `GET` | `/api/v1/accounts/{account_id}/aggregation` | Aggregate transaction metrics |
 | `GET` | `/api/v1/accounts/{account_id}/risk` | Generate lending risk score |
@@ -169,37 +159,10 @@ The aggregation endpoint returns rounded monetary values and includes:
 
 ## Example Request and Response
 
-Link a bank account:
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/bank-accounts/link \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Lucas George","bank_name":"Capitec"}'
-```
-
-Example response:
-
-```json
-{
-  "user": {
-    "id": "650e8400-e29b-41d4-a716-446655440000",
-    "name": "Lucas George",
-    "created_at": "2026-05-05T10:00:00Z",
-    "updated_at": "2026-05-05T10:00:00Z"
-  },
-  "linked_account": {
-    "user_id": "650e8400-e29b-41d4-a716-446655440000",
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "bank_name": "Capitec",
-    "created_at": "2026-05-05T10:00:00Z"
-  }
-}
-```
-
 Upload a PDF bank statement:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/bank-accounts/statement-upload \
+curl -X POST http://127.0.0.1:8000/api/v1/bank-statements/upload \
   -F "user_names=Lucas George" \
   -F "bank_name=FNB Statement April 2026" \
   -F "file=@statement.pdf;type=application/pdf"
@@ -217,12 +180,12 @@ Example response:
 }
 ```
 
-The PDF is stored in MinIO, OCR processing is simulated, and the API creates linked metadata plus a random transaction file internally. Internal local file paths are not exposed in the API response.
+The PDF is stored in MinIO, OCR processing is simulated, and the API creates statement metadata plus a random transaction file internally. Internal local file paths are not exposed in the API response.
 
 The upload flow is:
 
 1. Store the PDF in MinIO.
-2. Reuse the linked account flow to create user/account metadata.
+2. Create user metadata.
 3. Reuse the transaction generation logic to simulate extracted transactions.
 4. Create the `bank_statement` metadata row with the MinIO object reference.
 
@@ -236,7 +199,7 @@ Response includes:
 
 - `account_id`
 - `user`
-- `linked_account`
+- `bank_statement`
 - `aggregation`
 - `risk`
 - `recommendations`
@@ -389,9 +352,8 @@ If tests fail, `git push` is blocked. Keep Docker running before pushing.
 
 ## Assumptions
 
-- Bank linking is simulated and does not call a real banking API.
 - PDF statement upload stores the original file in MinIO and simulates OCR; no real PDF parsing is performed.
-- Linked account transaction histories are randomly generated and include more than 3 months of data, salary, deposits, withdrawals, and at least 7 transactions per week.
+- Statement transaction histories are randomly generated and include more than 3 months of data, salary, deposits, withdrawals, and at least 7 transactions per week.
 - Categorisation, risk scoring, and recommendations are rule-based.
 - MinIO simulates S3 storage for uploaded PDF bank statements.
 - Local `data/input` and `data/output` folders simulate S3-style transaction input and processed output buckets.
@@ -402,7 +364,7 @@ If tests fail, `git push` is blocked. Keep Docker running before pushing.
 
 - Replace local folders with S3 buckets and object lifecycle policies.
 - Add authentication, authorization, and tenant isolation.
-- Add request validation for duplicate linked accounts and idempotency.
+- Add request validation for duplicate statement uploads and idempotency.
 - Add database constraints and indexes for lookup patterns.
 - Use managed PostgreSQL and ElastiCache.
 - Add structured logging, tracing, metrics, and alerting.

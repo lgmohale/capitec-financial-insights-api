@@ -12,13 +12,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.dependencies import get_db
-from app.db.models import BankStatement, Base
+from app.db.models import BankStatement, Base, User
 from app.main import app
-from app.schemas.bank_accounts import (
-    LinkBankAccountResponse,
-    LinkedAccountMetadata,
-    UserMetadata,
-)
 from app.services import bank_statement_service
 from app.storage import transactions
 
@@ -40,7 +35,7 @@ def test_upload_valid_pdf_creates_statement_record_and_clean_response(
     client = TestClient(app)
     try:
         response = client.post(
-            "/api/v1/bank-accounts/statement-upload",
+            "/api/v1/bank-statements/upload",
             data={
                 "user_names": "Lucas George",
                 "bank_name": "FNB Statement April 2026",
@@ -87,7 +82,7 @@ def test_upload_rejects_non_pdf_file(tmp_path, monkeypatch) -> None:
 
     try:
         response = client.post(
-            "/api/v1/bank-accounts/statement-upload",
+            "/api/v1/bank-statements/upload",
             data={
                 "user_names": "Lucas George",
                 "bank_name": "FNB Statement April 2026",
@@ -109,7 +104,7 @@ def test_upload_rejects_non_pdf_file(tmp_path, monkeypatch) -> None:
         app.dependency_overrides.clear()
 
 
-def test_bank_statement_service_reuses_linked_account_generation_flow(
+def test_bank_statement_service_reuses_transaction_generation_flow(
     monkeypatch,
 ) -> None:
     calls = {}
@@ -122,31 +117,9 @@ def test_bank_statement_service_reuses_linked_account_generation_flow(
         }
         return f"bank-statements/{user_id}/{statement_id}.pdf"
 
-    def fake_create_linked_account(name, bank_name, db, user_id, linked_account_id):
-        calls["create_linked_account"] = {
-            "name": name,
-            "bank_name": bank_name,
-            "db": db,
-            "user_id": user_id,
-            "linked_account_id": linked_account_id,
-        }
-        return (
-            LinkBankAccountResponse(
-                user=UserMetadata(
-                    id=user_id,
-                    name=name,
-                    created_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
-                    updated_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
-                ),
-                linked_account=LinkedAccountMetadata(
-                    user_id=user_id,
-                    id=linked_account_id,
-                    bank_name=bank_name,
-                    created_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
-                ),
-            ),
-            Path(f"data/input/{linked_account_id}.json"),
-        )
+    def fake_write_starter_transactions(statement_id):
+        calls["write_starter_transactions"] = {"statement_id": statement_id}
+        return FakePath()
 
     monkeypatch.setattr(
         bank_statement_service,
@@ -155,8 +128,8 @@ def test_bank_statement_service_reuses_linked_account_generation_flow(
     )
     monkeypatch.setattr(
         bank_statement_service,
-        "create_linked_account",
-        fake_create_linked_account,
+        "write_starter_transactions",
+        fake_write_starter_transactions,
     )
 
     db = FakeSession()
@@ -174,17 +147,17 @@ def test_bank_statement_service_reuses_linked_account_generation_flow(
         )
     )
 
-    assert calls["upload"]["user_id"] == calls["create_linked_account"]["user_id"]
     assert (
         calls["upload"]["statement_id"]
-        == calls["create_linked_account"]["linked_account_id"]
+        == calls["write_starter_transactions"]["statement_id"]
     )
-    assert calls["create_linked_account"]["name"] == "Lucas George"
-    assert calls["create_linked_account"]["bank_name"] == "FNB Statement April 2026"
     assert calls["upload"]["content"] == b"%PDF-1.4 simulated statement"
     assert db.committed is True
-    assert len(db.added) == 1
-    assert isinstance(db.added[0], BankStatement)
+    assert len(db.added) == 2
+    assert isinstance(db.added[0], User)
+    assert db.added[0].name == "Lucas George"
+    assert isinstance(db.added[1], BankStatement)
+    assert db.added[1].bank_name == "FNB Statement April 2026"
     assert response.id == calls["upload"]["statement_id"]
     assert response.file_url.startswith("bank-statements/")
 
@@ -233,6 +206,9 @@ class FakeSession:
     def add(self, item: object) -> None:
         self.added.append(item)
 
+    def flush(self) -> None:
+        pass
+
     def commit(self) -> None:
         self.committed = True
 
@@ -241,3 +217,13 @@ class FakeSession:
 
     def refresh(self, item: object) -> None:
         item.created_at = datetime(2026, 5, 5, tzinfo=timezone.utc)  # noqa: UP017
+        if hasattr(item, "updated_at"):
+            item.updated_at = datetime(2026, 5, 5, tzinfo=timezone.utc)  # noqa: UP017
+
+
+class FakePath:
+    def __init__(self) -> None:
+        self.deleted = False
+
+    def unlink(self, missing_ok: bool = False) -> None:
+        self.deleted = True

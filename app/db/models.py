@@ -32,27 +32,6 @@ class User(Base):
     )
 
 
-class LinkedAccount(Base):
-    __tablename__ = "linked_account"
-
-    user_id: Mapped[PythonUUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("users.id"),
-        primary_key=True,
-    )
-    id: Mapped[PythonUUID] = mapped_column(
-        Uuid(as_uuid=True),
-        nullable=False,
-        default=uuid4,
-    )
-    bank_name: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
-
-
 class BankStatement(Base):
     __tablename__ = "bank_statement"
 
