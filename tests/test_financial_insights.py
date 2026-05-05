@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from app.db.models import LinkedAccount, User
+from app.db.models import BankStatement, User
 from app.schemas.aggregation import AggregationResponse
 from app.schemas.recommendations import RecommendationsResponse
 from app.schemas.risk import RiskResponse
@@ -20,13 +20,14 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
         created_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
         updated_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
     )
-    linked_account = LinkedAccount(
+    bank_statement = BankStatement(
         user_id=USER_ID,
         id=ACCOUNT_ID,
-        bank_name="Capitec",
+        bank_name="FNB Statement April 2026",
+        file_url=f"bank-statements/{USER_ID}/{ACCOUNT_ID}.pdf",
         created_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
     )
-    db = FakeSession([linked_account, user])
+    db = FakeSession([bank_statement, user])
 
     monkeypatch.setattr(
         financial_insights_service,
@@ -102,7 +103,7 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
 
     assert response.account_id == ACCOUNT_ID
     assert response.user.id == USER_ID
-    assert response.linked_account.id == ACCOUNT_ID
+    assert response.bank_statement.id == ACCOUNT_ID
     assert response.aggregation.cached is True
     assert response.risk.risk_band == "LOW_RISK"
     assert response.recommendations.financial_health_score == 90

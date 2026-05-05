@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.v1.aggregation import router as aggregation_router
-from app.api.v1.bank_accounts import router as bank_accounts_router
+from app.api.v1.bank_statements import router as bank_statements_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.financial_insights import router as financial_insights_router
 from app.api.v1.recommendations import router as recommendations_router
@@ -12,10 +12,9 @@ app = FastAPI(
     title="Capitec Financial Insights API",
     version="0.1.0",
     description=(
-        "FastAPI backend for simulated bank account linking, metadata-only "
-        "PostgreSQL storage, MinIO PDF statement uploads, local S3-style "
-        "transaction files, Redis-backed insight caching, and rule-based "
-        "financial insights."
+        "FastAPI backend for MinIO PDF statement uploads, metadata-only "
+        "PostgreSQL storage, local S3-style transaction files, Redis-backed "
+        "insight caching, and rule-based financial insights."
     ),
     contact={"name": "Capitec Financial Insights API Submission"},
     openapi_tags=[
@@ -24,10 +23,9 @@ app = FastAPI(
             "description": "Service health and readiness checks.",
         },
         {
-            "name": "bank accounts",
+            "name": "bank statements",
             "description": (
-                "Simulated bank account linking, PDF statement uploads, and "
-                "metadata creation."
+                "MinIO-backed PDF statement uploads and statement metadata creation."
             ),
         },
         {
@@ -51,14 +49,14 @@ app = FastAPI(
         {
             "name": "financial insights",
             "description": (
-                "Combined user, account, aggregation, risk, and recommendation view."
+                "Combined user, statement, aggregation, risk, and recommendation view."
             ),
         },
     ],
 )
 
 app.include_router(aggregation_router)
-app.include_router(bank_accounts_router)
+app.include_router(bank_statements_router)
 app.include_router(categories_router)
 app.include_router(financial_insights_router)
 app.include_router(recommendations_router)

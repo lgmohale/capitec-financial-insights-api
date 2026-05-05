@@ -62,20 +62,12 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert health_response.status_code == 200
         assert health_response.json() == {"status": "ok"}
 
-        link_response = client.post(
-            "/api/v1/bank-accounts/link",
-            json={"name": "Lucas George", "bank_name": "Capitec"},
-        )
-        assert link_response.status_code == 201
-        link_payload = link_response.json()
-        account_id = link_payload["linked_account"]["id"]
-        assert link_payload["user"]["name"] == "Lucas George"
-        assert link_payload["linked_account"]["bank_name"] == "Capitec"
-        assert (input_dir / f"{account_id}.json").exists()
-
         upload_response = client.post(
-            "/api/v1/bank-accounts/statement-upload",
-            data={"user_names": "Mia George", "bank_name": "FNB Statement April 2026"},
+            "/api/v1/bank-statements/upload",
+            data={
+                "user_names": "Lucas George",
+                "bank_name": "FNB Statement April 2026",
+            },
             files={
                 "file": (
                     "statement.pdf",
@@ -86,22 +78,20 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         )
         assert upload_response.status_code == 201
         upload_payload = upload_response.json()
-        uploaded_account_id = upload_payload["id"]
+        account_id = upload_payload["id"]
         assert upload_payload["user_id"]
         assert upload_payload["bank_name"] == "FNB Statement April 2026"
         assert upload_payload["file_url"] == (
-            f"bank-statements/{upload_payload['user_id']}/{uploaded_account_id}.pdf"
+            f"bank-statements/{upload_payload['user_id']}/{account_id}.pdf"
         )
         assert upload_payload["message"] == (
             "Bank statement uploaded successfully and queued for processing."
         )
         assert "transaction_file_path" not in upload_payload
-        assert (input_dir / f"{uploaded_account_id}.json").exists()
+        assert (input_dir / f"{account_id}.json").exists()
         with testing_session_local() as db:
             bank_statement = db.scalar(
-                select(BankStatement).where(
-                    BankStatement.id == UUID(uploaded_account_id)
-                )
+                select(BankStatement).where(BankStatement.id == UUID(account_id))
             )
         assert bank_statement is not None
         assert str(bank_statement.user_id) == upload_payload["user_id"]
@@ -162,7 +152,7 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         insights_payload = insights_response.json()
         assert insights_payload["account_id"] == account_id
         assert insights_payload["user"]["name"] == "Lucas George"
-        assert insights_payload["linked_account"]["id"] == account_id
+        assert insights_payload["bank_statement"]["id"] == account_id
         assert insights_payload["aggregation"]["cached"] is True
         assert insights_payload["risk"]["cached"] is True
         assert insights_payload["recommendations"]["cached"] is True

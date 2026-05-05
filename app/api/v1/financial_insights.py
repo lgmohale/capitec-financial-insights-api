@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/v1/accounts", tags=["financial insights"])
     response_model=FinancialInsightsResponse,
     summary="Get combined financial insights",
     description=(
-        "Returns user metadata, linked account metadata, aggregation, risk, "
+        "Returns user metadata, bank statement metadata, aggregation, risk, "
         "recommendations, and generation timestamp. This endpoint reuses the "
         "existing services and their normal cache behavior."
     ),
