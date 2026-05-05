@@ -39,8 +39,21 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
             net_cashflow=75.0,
             transaction_count=2,
             month_count=1,
+            average_monthly_income=100.0,
+            average_monthly_expenses=25.0,
+            average_monthly_net_cashflow=75.0,
+            savings_rate=75.0,
             category_breakdown={},
             monthly_summary={},
+            risk_flags={
+                "salary_detected": True,
+                "has_gambling_spend": False,
+                "has_negative_cashflow_month": False,
+                "has_unknown_income": False,
+            },
+            insights=[
+                "Salary income appears consistent across the analysed period.",
+            ],
             output_file_path="data/output/aggregation.json",
         ),
     )

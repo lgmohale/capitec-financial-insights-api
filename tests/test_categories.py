@@ -58,10 +58,8 @@ def test_categorise_account_transactions_builds_output_and_cache(
     assert response.cached is False
     assert summary_by_category["salary"].transaction_count == 1
     assert summary_by_category["salary"].total_amount == 46579.0
-    assert summary_by_category["salary"].month_count == 1
     assert summary_by_category["groceries"].transaction_count == 1
     assert summary_by_category["groceries"].total_amount == 1240.5
-    assert summary_by_category["groceries"].month_count == 1
     assert cached_values[f"categorisation:{ACCOUNT_ID}"]["cached"] is False
 
     output_file = output_dir / f"{ACCOUNT_ID}_categories.json"
@@ -81,7 +79,6 @@ def test_categorise_account_transactions_returns_cached_result(monkeypatch) -> N
                     "category": "salary",
                     "total_amount": 100.0,
                     "transaction_count": 1,
-                    "month_count": 1,
                 }
             ],
             "output_file_path": "data/output/result.json",
@@ -92,5 +89,4 @@ def test_categorise_account_transactions_returns_cached_result(monkeypatch) -> N
 
     assert response.cached is True
     assert response.category_summary[0].category == "salary"
-    assert response.category_summary[0].month_count == 1
     assert response.output_file_path == "data/output/result.json"

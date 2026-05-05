@@ -14,9 +14,10 @@ router = APIRouter(prefix="/api/v1/accounts", tags=["aggregation"])
     summary="Aggregate account transactions",
     description=(
         "Reuses categorisation rules to calculate income, expenses, net cashflow, "
-        "transaction count, category breakdown, and monthly summaries. Writes "
-        "`data/output/{account_id}_aggregation.json` and caches the response "
-        "with Redis key `aggregation:{account_id}`."
+        "transaction count, average monthly values, savings rates, category "
+        "breakdown, simple risk flags, deterministic insights, and monthly "
+        "summaries. Writes `data/output/{account_id}_aggregation.json` and "
+        "caches the response with Redis key `aggregation:{account_id}`."
     ),
 )
 def get_account_aggregation(
