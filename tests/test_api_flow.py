@@ -72,7 +72,6 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
             item["category"]: item for item in categories_payload["category_summary"]
         }
         assert summary_by_category["salary"]["transaction_count"] >= 1
-        assert summary_by_category["salary"]["month_count"] >= 1
         assert Path(categories_payload["output_file_path"]).exists()
 
         aggregation_response = client.get(f"/api/v1/accounts/{account_id}/aggregation")
@@ -83,6 +82,17 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert aggregation_payload["total_expenses"] > 0
         assert aggregation_payload["transaction_count"] >= 98
         assert aggregation_payload["month_count"] >= 4
+        assert aggregation_payload["average_monthly_income"] > 0
+        assert aggregation_payload["average_monthly_expenses"] > 0
+        assert "average_monthly_net_cashflow" in aggregation_payload
+        assert "savings_rate" in aggregation_payload
+        assert "risk_flags" in aggregation_payload
+        assert aggregation_payload["risk_flags"]["salary_detected"] is True
+        assert aggregation_payload["insights"]
+        assert "net_amount" in aggregation_payload["category_breakdown"]["salary"]
+        assert "savings_rate" in next(
+            iter(aggregation_payload["monthly_summary"].values())
+        )
         assert Path(aggregation_payload["output_file_path"]).exists()
 
         risk_response = client.get(f"/api/v1/accounts/{account_id}/risk")

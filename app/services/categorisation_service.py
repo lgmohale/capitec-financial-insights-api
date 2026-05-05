@@ -83,24 +83,20 @@ def build_category_summary(transactions: list[dict]) -> list[dict]:
             "category": category,
             "total_amount": 0.0,
             "transaction_count": 0,
-            "months": set(),
         }
         for category in CATEGORIES
     }
     for transaction in transactions:
         category = categorise_transaction(transaction)
         amount = abs(float(transaction.get("amount", 0.0)))
-        month = str(transaction.get("date", ""))[:7]
         category_summary[category]["total_amount"] += amount
         category_summary[category]["transaction_count"] += 1
-        category_summary[category]["months"].add(month)
 
     return [
         {
             "category": values["category"],
             "total_amount": round(values["total_amount"], 2),
             "transaction_count": values["transaction_count"],
-            "month_count": len(values["months"]),
         }
         for values in category_summary.values()
     ]

@@ -125,7 +125,13 @@ The categories endpoint returns one summary item per category with:
 - `category`
 - `total_amount`
 - `transaction_count`
-- `month_count`
+
+The aggregation endpoint returns rounded monetary values and includes:
+
+- top-level totals, average monthly values, savings rate, transaction count, and month count
+- category income, expenses, net amount, and income or expense percentages
+- monthly income, expenses, net cashflow, transaction count, and savings rate
+- simple risk flags and deterministic human-readable insights
 
 ## Example Request and Response
 
@@ -171,6 +177,69 @@ Response includes:
 - `risk`
 - `recommendations`
 - `generated_at`
+
+Get aggregation metrics:
+
+```bash
+curl http://127.0.0.1:8000/api/v1/accounts/{account_id}/aggregation
+```
+
+Example aggregation fields:
+
+```json
+{
+  "account_id": "550e8400-e29b-41d4-a716-446655440000",
+  "cached": false,
+  "total_income": 170528.22,
+  "total_expenses": 97019.68,
+  "net_cashflow": 73508.54,
+  "transaction_count": 102,
+  "month_count": 4,
+  "average_monthly_income": 42632.05,
+  "average_monthly_expenses": 24254.92,
+  "average_monthly_net_cashflow": 18377.13,
+  "savings_rate": 43.11,
+  "category_breakdown": {
+    "salary": {
+      "transaction_count": 4,
+      "income": 154318.96,
+      "expenses": 0.0,
+      "net_amount": 154318.96,
+      "income_percentage": 90.5
+    },
+    "rent_or_home_loan": {
+      "transaction_count": 3,
+      "income": 0.0,
+      "expenses": 39450.0,
+      "net_amount": -39450.0,
+      "expense_percentage": 40.66
+    }
+  },
+  "monthly_summary": {
+    "2026-01": {
+      "total_income": 35796.55,
+      "total_expenses": 22435.96,
+      "net_cashflow": 13360.59,
+      "transaction_count": 13,
+      "savings_rate": 37.32
+    }
+  },
+  "risk_flags": {
+    "salary_detected": true,
+    "has_gambling_spend": true,
+    "has_negative_cashflow_month": false,
+    "has_unknown_income": true
+  },
+  "insights": [
+    "Salary income appears consistent across the analysed period.",
+    "Rent or home loan is the largest expense category.",
+    "Net cashflow remained positive across all analysed months.",
+    "Gambling spend was detected in the analysed period.",
+    "Some income transactions could not be categorised and may require review."
+  ],
+  "output_file_path": "data/output/550e8400-e29b-41d4-a716-446655440000_aggregation.json"
+}
+```
 
 ## Run With Docker
 

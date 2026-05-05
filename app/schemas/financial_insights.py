@@ -34,8 +34,38 @@ class FinancialInsightsResponse(BaseModel):
                     "net_cashflow": 30788.5,
                     "transaction_count": 5,
                     "month_count": 1,
-                    "category_breakdown": {},
-                    "monthly_summary": {},
+                    "average_monthly_income": 46579.0,
+                    "average_monthly_expenses": 15790.5,
+                    "average_monthly_net_cashflow": 30788.5,
+                    "savings_rate": 66.1,
+                    "category_breakdown": {
+                        "salary": {
+                            "transaction_count": 1,
+                            "income": 46579.0,
+                            "expenses": 0.0,
+                            "net_amount": 46579.0,
+                            "income_percentage": 100.0,
+                        }
+                    },
+                    "monthly_summary": {
+                        "2026-04": {
+                            "total_income": 46579.0,
+                            "total_expenses": 15790.5,
+                            "net_cashflow": 30788.5,
+                            "transaction_count": 5,
+                            "savings_rate": 66.1,
+                        }
+                    },
+                    "risk_flags": {
+                        "salary_detected": True,
+                        "has_gambling_spend": True,
+                        "has_negative_cashflow_month": False,
+                        "has_unknown_income": False,
+                    },
+                    "insights": [
+                        "Salary income appears consistent across the analysed period.",
+                        "Gambling spend was detected in the analysed period.",
+                    ],
                     "output_file_path": "data/output/example_aggregation.json",
                 },
                 "risk": {

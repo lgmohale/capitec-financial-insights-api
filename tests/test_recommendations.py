@@ -31,19 +31,38 @@ def test_build_account_recommendations_creates_output_and_cache(
                 "net_cashflow": 2000.0,
                 "transaction_count": 4,
                 "month_count": 1,
+                "average_monthly_income": 10000.0,
+                "average_monthly_expenses": 8000.0,
+                "average_monthly_net_cashflow": 2000.0,
+                "savings_rate": 20.0,
                 "category_breakdown": {
                     "gambling": {
                         "transaction_count": 1,
                         "income": 0.0,
                         "expenses": 500.0,
+                        "net_amount": -500.0,
+                        "expense_percentage": 6.25,
                     },
                     "entertainment": {
                         "transaction_count": 1,
                         "income": 0.0,
                         "expenses": 1500.0,
+                        "net_amount": -1500.0,
+                        "expense_percentage": 18.75,
                     },
                 },
                 "monthly_summary": {},
+                "risk_flags": {
+                    "salary_detected": True,
+                    "has_gambling_spend": True,
+                    "has_negative_cashflow_month": False,
+                    "has_unknown_income": False,
+                },
+                "insights": [
+                    "Salary income appears consistent across the analysed period.",
+                    "Entertainment is the largest expense category.",
+                    "Gambling spend was detected in the analysed period.",
+                ],
                 "output_file_path": "data/output/aggregation.json",
             }
         ),

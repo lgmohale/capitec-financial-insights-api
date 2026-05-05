@@ -7,7 +7,6 @@ class CategorySummaryItem(BaseModel):
     category: str
     total_amount: float
     transaction_count: int
-    month_count: int
 
 
 class CategoriesResponse(BaseModel):
@@ -21,7 +20,6 @@ class CategoriesResponse(BaseModel):
                         "category": "groceries",
                         "total_amount": 4500.0,
                         "transaction_count": 12,
-                        "month_count": 3,
                     }
                 ],
                 "output_file_path": (

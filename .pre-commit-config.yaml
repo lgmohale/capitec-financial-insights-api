@@ -3,13 +3,18 @@ repos:
     rev: v0.8.4
     hooks:
       - id: ruff
-        args: [--fix]
+        name: Ruff lint and fix
+        args: [--fix, --exit-non-zero-on-fix]
+
       - id: ruff-format
+        name: Ruff format
+
   - repo: local
     hooks:
       - id: pytest-pre-push
         name: Run pytest before push
-        entry: docker compose run --rm api pytest
+        entry: docker compose run --rm api pytest -q
         language: system
         pass_filenames: false
         stages: [pre-push]
+        always_run: true
