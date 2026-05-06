@@ -1,0 +1,70 @@
+name: CD
+
+on:
+  push:
+    branches: [staging, main]
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  staging-image:
+    name: Build staging image
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'staging'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build staging Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: transaction-aggregation-api:staging
+
+      - name: Validate staging container build
+        run: docker run --rm transaction-aggregation-api:staging python -m compileall app
+
+      - name: Run unit tests inside staging image
+        run: docker run --rm transaction-aggregation-api:staging pytest tests/unit -q
+
+      - name: Deployment note
+        run: |
+          echo "Staging image built successfully. This image can be pushed to a registry or deployed to a staging runtime."
+
+  production-image:
+    name: Build production image
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: |
+            transaction-aggregation-api:latest
+            transaction-aggregation-api:production
+
+      - name: Validate production container build
+        run: docker run --rm transaction-aggregation-api:latest python -m compileall app
+
+      - name: Run unit tests inside production image
+        run: docker run --rm transaction-aggregation-api:latest pytest tests/unit -q
+
+      - name: Deployment note
+        run: |
+          echo "Production image built successfully. This image can be pushed to a registry or deployed to a cloud runtime."

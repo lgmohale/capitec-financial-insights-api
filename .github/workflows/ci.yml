@@ -2,18 +2,50 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [dev, staging, main]
   pull_request:
-    branches: [main]
+    branches: [dev, staging, main]
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  branch-flow:
+    name: Branch flow validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Validate pull request source and target branches
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          SOURCE_BRANCH: ${{ github.head_ref }}
+        run: |
+          echo "Validating branch flow: ${SOURCE_BRANCH} -> ${BASE_BRANCH}"
+
+          if [ "${BASE_BRANCH}" = "main" ] && [ "${SOURCE_BRANCH}" != "staging" ]; then
+            echo "Only staging can merge into main."
+            exit 1
+          fi
+
+          if [ "${BASE_BRANCH}" = "staging" ] && [ "${SOURCE_BRANCH}" != "dev" ]; then
+            echo "Only dev can merge into staging."
+            exit 1
+          fi
+
+          if [ "${BASE_BRANCH}" = "dev" ] && [ "${SOURCE_BRANCH}" = "main" ]; then
+            echo "main must not be merged back into dev."
+            exit 1
+          fi
+
+          echo "Branch flow is valid."
+
   lint:
     name: Ruff lint
     runs-on: ubuntu-latest
+    needs: [branch-flow]
+    if: always() && (github.event_name == 'push' || needs.branch-flow.result == 'success')
 
     steps:
       - name: Check out repository
@@ -34,9 +66,78 @@ jobs:
       - name: Run Ruff lint
         run: ruff check .
 
+  config-validation:
+    name: Config validation
+    runs-on: ubuntu-latest
+    needs: [branch-flow]
+    if: always() && (github.event_name == 'push' || needs.branch-flow.result == 'success')
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose config
+        run: docker compose config
+
+      - name: Validate environment example
+        run: |
+          test -f .env.example
+
+          for variable in \
+            DATABASE_URL \
+            MINIO_ENDPOINT \
+            MINIO_PORT \
+            MINIO_ACCESS_KEY \
+            MINIO_SECRET_KEY \
+            MINIO_BUCKET
+          do
+            grep -q "^${variable}=" .env.example
+          done
+
+  docker-build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    needs: [branch-flow]
+    if: always() && (github.event_name == 'push' || needs.branch-flow.result == 'success')
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build API Docker image
+        run: docker build -t transaction-aggregation-api:test .
+
+  dependency-scan:
+    name: Dependency security scan
+    runs-on: ubuntu-latest
+    needs: [branch-flow]
+    if: always() && (github.event_name == 'push' || needs.branch-flow.result == 'success')
+    continue-on-error: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt --cache-dir .cache/pip-audit
+
   format:
     name: Ruff format check
     runs-on: ubuntu-latest
+    needs: [branch-flow]
+    if: always() && (github.event_name == 'push' || needs.branch-flow.result == 'success')
 
     steps:
       - name: Check out repository
@@ -57,10 +158,11 @@ jobs:
       - name: Check Ruff formatting
         run: ruff format --check .
 
-  test:
-    name: Pytest
+  unit-tests:
+    name: Unit tests
     runs-on: ubuntu-latest
-    needs: [lint, format]
+    needs: [branch-flow]
+    if: always() && (github.event_name == 'push' || needs.branch-flow.result == 'success')
 
     steps:
       - name: Check out repository
@@ -78,5 +180,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests
-        run: pytest -q
+      - name: Run unit tests
+        run: pytest tests/unit -q --cov=app --cov-report=term-missing
+
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: [lint, format, unit-tests, config-validation, docker-build]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Start Docker Compose services
+        run: docker compose up -d --wait postgres redis minio
+
+      - name: Run database migrations
+        run: docker compose run --rm api alembic upgrade head
+
+      - name: Run integration tests
+        run: docker compose run --rm api pytest tests/integration -q
+
+      - name: Stop Docker Compose services
+        if: always()
+        run: docker compose down -v 
