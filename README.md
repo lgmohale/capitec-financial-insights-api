@@ -28,7 +28,8 @@ The system supports a simple financial insights workflow:
 - PostgreSQL for metadata only
 - Redis to simulate AWS ElastiCache
 - MinIO to simulate S3-style object storage for statement PDFs and generated JSON outputs
-- Docker Compose for local API, PostgreSQL, Redis, and MinIO services
+- Environment-specific configuration for `local`, `staging`, and `production`
+- Docker Compose for local API, PostgreSQL, Redis, and MinIO services only
 - Alembic for database migrations
 - Pytest, Ruff, pre-commit, and GitHub Actions for quality checks
 
@@ -38,13 +39,19 @@ The system supports a simple financial insights workflow:
 
 ## Environment Variables
 
-Docker Compose provides the required service connection values for the API container. A `.env` file can still be created from `.env.example` for local configuration overrides, but no local PostgreSQL, Redis, or MinIO setup is required when using Docker.
+The API uses `APP_ENV` to select environment behaviour. Supported values are:
 
-Example:
+- `local`
+- `staging`
+- `production`
+
+Docker Compose is intended for local development only and provides local PostgreSQL, Redis, and MinIO services. Staging and production should use managed PostgreSQL, managed cache, and managed object storage by setting explicit environment variables.
+
+Example local configuration:
 
 ```env
 APP_NAME=capitec-financial-insights-api
-APP_ENV=development
+APP_ENV=local
 DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/financial_insights
 REDIS_URL=redis://redis:6379/0
 MINIO_ENDPOINT=minio
@@ -54,6 +61,14 @@ MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=bank-statements
 MINIO_USE_SSL=false
 ```
+
+Example files are included for each environment:
+
+- `.env.local.example`
+- `.env.staging.example`
+- `.env.production.example`
+
+For `staging` and `production`, the app fails fast if local Docker Compose defaults such as `localhost`, `minio`, or `minioadmin` credentials are used.
 
 ## MinIO Object Storage
 
@@ -409,6 +424,8 @@ CD runs on pushes to `staging` and `main`.
 - `main` builds and validates `transaction-aggregation-api:latest` and `transaction-aggregation-api:production`.
 
 The CD workflow validates the Docker image and runs unit tests inside the built container. Actual cloud deployment is intentionally out of scope for this assessment.
+
+Docker Compose remains local-only. Staging and production image builds are validated in CI/CD, but a real deployment would inject managed service configuration through the target runtime.
 
 ## Assumptions
 
