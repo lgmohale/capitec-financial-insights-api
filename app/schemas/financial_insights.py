@@ -4,9 +4,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from app.schemas.aggregation import AggregationResponse
-from app.schemas.bank_accounts import LinkedAccountMetadata, UserMetadata
+from app.schemas.bank_statements import BankStatementMetadata
 from app.schemas.recommendations import RecommendationsResponse
 from app.schemas.risk import RiskResponse
+from app.schemas.users import UserMetadata
 
 
 class FinancialInsightsResponse(BaseModel):
@@ -20,10 +21,14 @@ class FinancialInsightsResponse(BaseModel):
                     "created_at": "2026-05-05T10:00:00Z",
                     "updated_at": "2026-05-05T10:00:00Z",
                 },
-                "linked_account": {
+                "bank_statement": {
                     "user_id": "650e8400-e29b-41d4-a716-446655440000",
                     "id": "550e8400-e29b-41d4-a716-446655440000",
-                    "bank_name": "Capitec",
+                    "bank_name": "FNB Statement April 2026",
+                    "file_url": (
+                        "bank-statements/650e8400-e29b-41d4-a716-446655440000/"
+                        "550e8400-e29b-41d4-a716-446655440000.pdf"
+                    ),
                     "created_at": "2026-05-05T10:00:00Z",
                 },
                 "aggregation": {
@@ -109,7 +114,7 @@ class FinancialInsightsResponse(BaseModel):
 
     account_id: UUID
     user: UserMetadata
-    linked_account: LinkedAccountMetadata
+    bank_statement: BankStatementMetadata
     aggregation: AggregationResponse
     risk: RiskResponse
     recommendations: RecommendationsResponse

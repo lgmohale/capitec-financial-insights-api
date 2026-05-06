@@ -23,7 +23,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "users",
-        sa.Column("uuid", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column(
             "created_at",
@@ -37,24 +37,9 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.PrimaryKeyConstraint("uuid"),
-    )
-    op.create_table(
-        "linked_account",
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("uuid", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("bank_name", sa.String(), nullable=False),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.uuid"]),
-        sa.PrimaryKeyConstraint("user_id"),
+        sa.PrimaryKeyConstraint("id"),
     )
 
 
 def downgrade() -> None:
-    op.drop_table("linked_account")
     op.drop_table("users")
