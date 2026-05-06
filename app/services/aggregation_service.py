@@ -1,6 +1,4 @@
-import json
 from decimal import ROUND_HALF_UP, Decimal
-from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
@@ -11,7 +9,8 @@ from app.services.categorisation_service import (
     categorise_transaction,
     read_transactions,
 )
-from app.storage.transactions import OUTPUT_DIR
+from app.storage.object_storage import upload_json_object
+from app.storage.transactions import processed_output_object_key
 
 MONEY_QUANTIZER = Decimal("0.01")
 
@@ -29,11 +28,10 @@ def aggregate_account_transactions(
 
     transactions = read_transactions(account_id)
     aggregation = build_aggregation(transactions)
-    output_file_path = write_aggregation_output(account_id, aggregation)
+    write_aggregation_output(account_id, aggregation)
     result = AggregationResponse(
         account_id=account_id,
         cached=False,
-        output_file_path=str(output_file_path),
         **aggregation,
     )
 
@@ -227,18 +225,12 @@ def round_metric(value: float) -> float:
     )
 
 
-def write_aggregation_output(account_id: UUID, aggregation: dict) -> Path:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_file_path = OUTPUT_DIR / f"{account_id}_aggregation.json"
-    output_file_path.write_text(
-        json.dumps(
-            {
-                "account_id": str(account_id),
-                **aggregation,
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+def write_aggregation_output(account_id: UUID, aggregation: dict) -> str:
+    object_key = processed_output_object_key(account_id, "aggregation")
+    return upload_json_object(
+        object_key=object_key,
+        value={
+            "account_id": str(account_id),
+            **aggregation,
+        },
     )
-    return output_file_path

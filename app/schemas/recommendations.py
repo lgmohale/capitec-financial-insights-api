@@ -21,8 +21,9 @@ class RecommendationsResponse(BaseModel):
                     "Salary appears consistent.",
                     "Cashflow is positive.",
                 ],
-                "output_file_path": (
-                    "data/output/550e8400-e29b-41d4-a716-446655440000_recommendations.json"
+                "bank_statement_pdf_download_url": (
+                    "http://localhost:8000/api/v1/bank-statements/"
+                    "550e8400-e29b-41d4-a716-446655440000/download"
                 ),
             }
         }
@@ -34,4 +35,4 @@ class RecommendationsResponse(BaseModel):
     recommendations: list[str]
     priority_actions: list[str]
     positive_observations: list[str]
-    output_file_path: str
+    bank_statement_pdf_download_url: str = ""

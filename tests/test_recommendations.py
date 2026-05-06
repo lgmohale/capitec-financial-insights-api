@@ -6,13 +6,17 @@ ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
 def test_build_account_recommendations_creates_output_and_cache(
-    tmp_path,
     monkeypatch,
 ) -> None:
-    output_dir = tmp_path / "output"
     cached_values = {}
+    uploaded_objects = {}
 
-    monkeypatch.setattr(recommendation_service, "OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(
+        recommendation_service,
+        "upload_json_object",
+        lambda object_key, value: uploaded_objects.setdefault(object_key, value)
+        and object_key,
+    )
     monkeypatch.setattr(recommendation_service, "get_cache", cached_values.get)
     monkeypatch.setattr(
         recommendation_service,
@@ -63,7 +67,9 @@ def test_build_account_recommendations_creates_output_and_cache(
                     "Entertainment is the largest expense category.",
                     "Gambling spend was detected in the analysed period.",
                 ],
-                "output_file_path": "data/output/aggregation.json",
+                "bank_statement_pdf_download_url": (
+                    f"http://testserver/api/v1/bank-statements/{account_id}/download"
+                ),
             }
         ),
     )
@@ -89,7 +95,9 @@ def test_build_account_recommendations_creates_output_and_cache(
                     "triggered_rules": [],
                 },
                 "recommendation": "Medium lending risk.",
-                "output_file_path": "data/output/risk.json",
+                "bank_statement_pdf_download_url": (
+                    f"http://testserver/api/v1/bank-statements/{account_id}/download"
+                ),
             }
         ),
     )
@@ -106,9 +114,9 @@ def test_build_account_recommendations_creates_output_and_cache(
     assert "Cashflow is positive." in response.positive_observations
     assert cached_values[f"recommendations:{ACCOUNT_ID}"]["cached"] is False
 
-    output_file = output_dir / f"{ACCOUNT_ID}_recommendations.json"
-    assert response.output_file_path == str(output_file)
-    assert output_file.exists()
+    output_key = f"output/{ACCOUNT_ID}/recommendations.json"
+    assert response.bank_statement_pdf_download_url == ""
+    assert output_key in uploaded_objects
 
 
 def test_build_account_recommendations_returns_cached_result(monkeypatch) -> None:
@@ -122,7 +130,9 @@ def test_build_account_recommendations_returns_cached_result(monkeypatch) -> Non
             "recommendations": ["Build emergency savings."],
             "priority_actions": ["Keep monitoring spending and savings monthly."],
             "positive_observations": ["Cashflow is positive."],
-            "output_file_path": "data/output/result.json",
+            "bank_statement_pdf_download_url": (
+                f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
+            ),
         },
     )
 
@@ -131,7 +141,9 @@ def test_build_account_recommendations_returns_cached_result(monkeypatch) -> Non
     assert response.cached is True
     assert response.financial_health_score == 82
     assert response.recommendations == ["Build emergency savings."]
-    assert response.output_file_path == "data/output/result.json"
+    assert response.bank_statement_pdf_download_url == (
+        f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
+    )
 
 
 class FakeModel:

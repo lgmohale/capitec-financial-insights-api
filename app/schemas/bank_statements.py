@@ -13,7 +13,7 @@ class BankStatementMetadata(BaseModel):
                 "user_id": "650e8400-e29b-41d4-a716-446655440000",
                 "bank_name": "FNB Statement April 2026",
                 "file_url": (
-                    "bank-statements/650e8400-e29b-41d4-a716-446655440000/"
+                    "input/650e8400-e29b-41d4-a716-446655440000/"
                     "550e8400-e29b-41d4-a716-446655440000.pdf"
                 ),
                 "created_at": "2026-05-05T10:00:00Z",
@@ -37,8 +37,12 @@ class UploadStatementResponse(BaseModel):
                 "user_id": "650e8400-e29b-41d4-a716-446655440000",
                 "bank_name": "FNB Statement April 2026",
                 "file_url": (
-                    "bank-statements/650e8400-e29b-41d4-a716-446655440000/"
+                    "input/650e8400-e29b-41d4-a716-446655440000/"
                     "550e8400-e29b-41d4-a716-446655440000.pdf"
+                ),
+                "bank_statement_pdf_download_url": (
+                    "http://localhost:8000/api/v1/bank-statements/"
+                    "550e8400-e29b-41d4-a716-446655440000/download"
                 ),
                 "message": (
                     "Bank statement uploaded successfully and queued for processing."
@@ -51,4 +55,5 @@ class UploadStatementResponse(BaseModel):
     user_id: UUID
     bank_name: str
     file_url: str
+    bank_statement_pdf_download_url: str = ""
     message: str

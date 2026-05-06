@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Generator
 from datetime import datetime, timezone
-from pathlib import Path
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -12,24 +11,31 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.dependencies import get_db
+from app.api.v1 import bank_statements
 from app.db.models import BankStatement, Base, User
 from app.main import app
 from app.services import bank_statement_service
-from app.storage import transactions
 
 
 def test_upload_valid_pdf_creates_statement_record_and_clean_response(
-    tmp_path,
     monkeypatch,
 ) -> None:
-    input_dir = tmp_path / "data" / "input"
-    session_local = configure_test_app(monkeypatch, input_dir)
+    generated_transaction_keys = []
+    session_local = configure_test_app(monkeypatch)
     monkeypatch.setattr(
         bank_statement_service,
         "upload_statement_pdf",
         lambda user_id, statement_id, file, content: (
-            f"bank-statements/{user_id}/{statement_id}.pdf"
+            f"input/{user_id}/{statement_id}.pdf"
         ),
+    )
+    monkeypatch.setattr(
+        bank_statement_service,
+        "write_starter_transactions",
+        lambda statement_id: generated_transaction_keys.append(
+            f"output/{statement_id}/transactions.json"
+        )
+        or generated_transaction_keys[-1],
     )
 
     client = TestClient(app)
@@ -54,8 +60,9 @@ def test_upload_valid_pdf_creates_statement_record_and_clean_response(
         statement_id = UUID(payload["id"])
         assert UUID(payload["user_id"])
         assert payload["bank_name"] == "FNB Statement April 2026"
-        assert payload["file_url"] == (
-            f"bank-statements/{payload['user_id']}/{payload['id']}.pdf"
+        assert payload["file_url"] == f"input/{payload['user_id']}/{payload['id']}.pdf"
+        assert payload["bank_statement_pdf_download_url"] == (
+            f"http://testserver/api/v1/bank-statements/{payload['id']}/download"
         )
         assert payload["message"] == bank_statement_service.SUCCESS_MESSAGE
         assert "transaction_file_path" not in payload
@@ -71,13 +78,15 @@ def test_upload_valid_pdf_creates_statement_record_and_clean_response(
         assert str(bank_statement.user_id) == payload["user_id"]
         assert bank_statement.bank_name == payload["bank_name"]
         assert bank_statement.file_url == payload["file_url"]
-        assert (input_dir / f"{statement_id}.json").exists()
+        assert generated_transaction_keys == [
+            f"output/{statement_id}/transactions.json"
+        ]
     finally:
         app.dependency_overrides.clear()
 
 
-def test_upload_rejects_non_pdf_file(tmp_path, monkeypatch) -> None:
-    configure_test_app(monkeypatch, tmp_path / "data" / "input")
+def test_upload_rejects_non_pdf_file(monkeypatch) -> None:
+    configure_test_app(monkeypatch)
     client = TestClient(app)
 
     try:
@@ -104,6 +113,44 @@ def test_upload_rejects_non_pdf_file(tmp_path, monkeypatch) -> None:
         app.dependency_overrides.clear()
 
 
+def test_download_bank_statement_pdf_streams_minio_object(monkeypatch) -> None:
+    session_local = configure_test_app(monkeypatch)
+    statement_id = UUID("550e8400-e29b-41d4-a716-446655440000")
+    user_id = UUID("650e8400-e29b-41d4-a716-446655440000")
+    file_url = f"input/{user_id}/{statement_id}.pdf"
+    read_calls = []
+    monkeypatch.setattr(
+        bank_statements,
+        "read_bytes_object",
+        lambda object_key: read_calls.append(object_key)
+        or b"%PDF-1.4 simulated statement",
+    )
+
+    with session_local() as db:
+        db.add(User(id=user_id, name="Lucas George"))
+        db.flush()
+        db.add(
+            BankStatement(
+                id=statement_id,
+                user_id=user_id,
+                bank_name="FNB Statement April 2026",
+                file_url=file_url,
+            )
+        )
+        db.commit()
+
+    client = TestClient(app)
+    try:
+        response = client.get(f"/api/v1/bank-statements/{statement_id}/download")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.content == b"%PDF-1.4 simulated statement"
+        assert read_calls == [file_url]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_bank_statement_service_reuses_transaction_generation_flow(
     monkeypatch,
 ) -> None:
@@ -115,11 +162,11 @@ def test_bank_statement_service_reuses_transaction_generation_flow(
             "statement_id": statement_id,
             "content": content,
         }
-        return f"bank-statements/{user_id}/{statement_id}.pdf"
+        return f"input/{user_id}/{statement_id}.pdf"
 
     def fake_write_starter_transactions(statement_id):
         calls["write_starter_transactions"] = {"statement_id": statement_id}
-        return FakePath()
+        return f"output/{statement_id}/transactions.json"
 
     monkeypatch.setattr(
         bank_statement_service,
@@ -159,11 +206,10 @@ def test_bank_statement_service_reuses_transaction_generation_flow(
     assert isinstance(db.added[1], BankStatement)
     assert db.added[1].bank_name == "FNB Statement April 2026"
     assert response.id == calls["upload"]["statement_id"]
-    assert response.file_url.startswith("bank-statements/")
+    assert response.file_url.startswith("input/")
 
 
-def configure_test_app(monkeypatch, input_dir: Path):
-    monkeypatch.setattr(transactions, "INPUT_DIR", input_dir)
+def configure_test_app(monkeypatch):
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -219,11 +265,3 @@ class FakeSession:
         item.created_at = datetime(2026, 5, 5, tzinfo=timezone.utc)  # noqa: UP017
         if hasattr(item, "updated_at"):
             item.updated_at = datetime(2026, 5, 5, tzinfo=timezone.utc)  # noqa: UP017
-
-
-class FakePath:
-    def __init__(self) -> None:
-        self.deleted = False
-
-    def unlink(self, missing_ok: bool = False) -> None:
-        self.deleted = True

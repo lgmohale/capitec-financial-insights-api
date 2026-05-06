@@ -1,12 +1,10 @@
-import json
 import random
 from collections import Counter
 from datetime import date, timedelta
-from pathlib import Path
 from uuid import UUID
 
-INPUT_DIR = Path("data/input")
-OUTPUT_DIR = Path("data/output")
+from app.storage.object_storage import read_json_object, upload_json_object
+
 MIN_HISTORY_WEEKS = 14
 MIN_TRANSACTIONS_PER_WEEK = 7
 
@@ -83,15 +81,24 @@ CREDIT_TEMPLATES = [
 ]
 
 
-def write_starter_transactions(transaction_file_id: UUID) -> Path:
-    INPUT_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = INPUT_DIR / f"{transaction_file_id}.json"
+def transaction_object_key(bank_statement_id: UUID) -> str:
+    return f"output/{bank_statement_id}/transactions.json"
+
+
+def processed_output_object_key(bank_statement_id: UUID, output_name: str) -> str:
+    return f"output/{bank_statement_id}/{output_name}.json"
+
+
+def write_starter_transactions(bank_statement_id: UUID) -> str:
     transactions = generate_random_transaction_history()
-    file_path.write_text(
-        json.dumps(transactions, indent=2) + "\n",
-        encoding="utf-8",
+    return upload_json_object(
+        object_key=transaction_object_key(bank_statement_id),
+        value=transactions,
     )
-    return file_path
+
+
+def read_starter_transactions(bank_statement_id: UUID) -> list[dict]:
+    return read_json_object(transaction_object_key(bank_statement_id))
 
 
 def generate_random_transaction_history() -> list[dict]:

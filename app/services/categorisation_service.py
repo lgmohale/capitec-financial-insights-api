@@ -1,12 +1,14 @@
-import json
-from pathlib import Path
 from uuid import UUID
 
 from fastapi import HTTPException, status
 
 from app.core.cache import get_cache, set_cache
 from app.schemas.categories import CategoriesResponse
-from app.storage.transactions import INPUT_DIR, OUTPUT_DIR
+from app.storage.object_storage import upload_json_object
+from app.storage.transactions import (
+    processed_output_object_key,
+    read_starter_transactions,
+)
 
 CATEGORY_KEYWORDS = {
     "salary": ["salary", "wage", "payroll", "employer"],
@@ -53,12 +55,11 @@ def categorise_account_transactions(
 
     transactions = read_transactions(account_id)
     category_summary = build_category_summary(transactions)
-    output_file_path = write_category_output(account_id, category_summary)
+    write_category_output(account_id, category_summary)
     result = CategoriesResponse(
         account_id=account_id,
         cached=False,
         category_summary=category_summary,
-        output_file_path=str(output_file_path),
     )
 
     set_cache(cache_key, result.model_dump(mode="json"))
@@ -67,14 +68,13 @@ def categorise_account_transactions(
 
 
 def read_transactions(account_id: UUID) -> list[dict]:
-    input_file_path = INPUT_DIR / f"{account_id}.json"
-    if not input_file_path.exists():
+    try:
+        return read_starter_transactions(account_id)
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Transaction file not found: {input_file_path}",
-        )
-
-    return json.loads(input_file_path.read_text(encoding="utf-8"))
+            detail=f"Transaction object not found for bank statement: {account_id}",
+        ) from exc
 
 
 def build_category_summary(transactions: list[dict]) -> list[dict]:
@@ -120,18 +120,12 @@ def categorise_transaction(transaction: dict) -> str:
 def write_category_output(
     account_id: UUID,
     category_summary: list[dict],
-) -> Path:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_file_path = OUTPUT_DIR / f"{account_id}_categories.json"
-    output_file_path.write_text(
-        json.dumps(
-            {
-                "account_id": str(account_id),
-                "category_summary": category_summary,
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+) -> str:
+    object_key = processed_output_object_key(account_id, "categories")
+    return upload_json_object(
+        object_key=object_key,
+        value={
+            "account_id": str(account_id),
+            "category_summary": category_summary,
+        },
     )
-    return output_file_path

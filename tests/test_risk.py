@@ -1,61 +1,63 @@
-import json
 from uuid import UUID
 
-from app.services import aggregation_service, categorisation_service, risk_service
+from app.services import aggregation_service, risk_service
 
 ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
 def test_score_account_risk_builds_explainable_result_and_cache(
-    tmp_path,
     monkeypatch,
 ) -> None:
-    input_dir = tmp_path / "input"
-    output_dir = tmp_path / "output"
-    input_dir.mkdir()
-    input_file = input_dir / f"{ACCOUNT_ID}.json"
-    input_file.write_text(
-        json.dumps(
-            [
-                {
-                    "id": "txn-001",
-                    "date": "2026-04-25",
-                    "type": "credit",
-                    "description": "SALARY PAYMENT EMPLOYER",
-                    "amount": 10000.0,
-                    "currency": "ZAR",
-                    "balance": 10000.0,
-                    "merchant": "Employer",
-                },
-                {
-                    "id": "txn-002",
-                    "date": "2026-04-26",
-                    "type": "debit",
-                    "description": "LOAN REPAYMENT",
-                    "amount": -5000.0,
-                    "currency": "ZAR",
-                    "balance": 5000.0,
-                    "merchant": "Personal Loan",
-                },
-                {
-                    "id": "txn-003",
-                    "date": "2026-04-27",
-                    "type": "debit",
-                    "description": "HOLLYWOODBETS ONLINE",
-                    "amount": -500.0,
-                    "currency": "ZAR",
-                    "balance": 4500.0,
-                    "merchant": "Hollywoodbets",
-                },
-            ]
-        ),
-        encoding="utf-8",
-    )
+    test_transactions = [
+        {
+            "id": "txn-001",
+            "date": "2026-04-25",
+            "type": "credit",
+            "description": "SALARY PAYMENT EMPLOYER",
+            "amount": 10000.0,
+            "currency": "ZAR",
+            "balance": 10000.0,
+            "merchant": "Employer",
+        },
+        {
+            "id": "txn-002",
+            "date": "2026-04-26",
+            "type": "debit",
+            "description": "LOAN REPAYMENT",
+            "amount": -5000.0,
+            "currency": "ZAR",
+            "balance": 5000.0,
+            "merchant": "Personal Loan",
+        },
+        {
+            "id": "txn-003",
+            "date": "2026-04-27",
+            "type": "debit",
+            "description": "HOLLYWOODBETS ONLINE",
+            "amount": -500.0,
+            "currency": "ZAR",
+            "balance": 4500.0,
+            "merchant": "Hollywoodbets",
+        },
+    ]
     cached_values = {}
+    uploaded_objects = {}
 
-    monkeypatch.setattr(categorisation_service, "INPUT_DIR", input_dir)
-    monkeypatch.setattr(aggregation_service, "OUTPUT_DIR", output_dir)
-    monkeypatch.setattr(risk_service, "OUTPUT_DIR", output_dir)
+    monkeypatch.setattr(
+        risk_service, "read_transactions", lambda account_id: test_transactions
+    )
+    monkeypatch.setattr(
+        aggregation_service,
+        "read_transactions",
+        lambda account_id: test_transactions,
+    )
+    for service in (aggregation_service, risk_service):
+        monkeypatch.setattr(
+            service,
+            "upload_json_object",
+            lambda object_key, value: uploaded_objects.setdefault(object_key, value)
+            and object_key,
+        )
     monkeypatch.setattr(aggregation_service, "get_cache", lambda key: None)
     monkeypatch.setattr(
         aggregation_service,
@@ -84,9 +86,9 @@ def test_score_account_risk_builds_explainable_result_and_cache(
     )
     assert cached_values[f"risk:{ACCOUNT_ID}"]["cached"] is False
 
-    output_file = output_dir / f"{ACCOUNT_ID}_risk.json"
-    assert response.output_file_path == str(output_file)
-    assert output_file.exists()
+    output_key = f"output/{ACCOUNT_ID}/risk.json"
+    assert response.bank_statement_pdf_download_url == ""
+    assert output_key in uploaded_objects
 
 
 def test_score_account_risk_returns_cached_result(monkeypatch) -> None:
@@ -111,7 +113,9 @@ def test_score_account_risk_returns_cached_result(monkeypatch) -> None:
                 "triggered_rules": ["Cached risk result."],
             },
             "recommendation": "Review manually.",
-            "output_file_path": "data/output/result.json",
+            "bank_statement_pdf_download_url": (
+                f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
+            ),
         },
     )
 
@@ -120,4 +124,6 @@ def test_score_account_risk_returns_cached_result(monkeypatch) -> None:
     assert response.cached is True
     assert response.risk_score == 80
     assert response.risk_band == "HIGH_RISK"
-    assert response.output_file_path == "data/output/result.json"
+    assert response.bank_statement_pdf_download_url == (
+        f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
+    )
