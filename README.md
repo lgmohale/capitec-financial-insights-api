@@ -1,6 +1,6 @@
 # Capitec Financial Insights API
 
-FastAPI backend for a transaction aggregation and financial insights system. The API accepts PDF bank statement uploads, stores PDFs in MinIO, stores generated transaction data as JSON files, stores only metadata in PostgreSQL, and produces cached financial insights using rule-based processing.
+FastAPI backend for a transaction aggregation and financial insights system. The API accepts PDF bank statement uploads, stores PDFs in MinIO, stores raw generated transaction data as JSON files, stores only metadata in PostgreSQL, and produces cached financial insights using rule-based processing.
 
 ## Project Overview
 
@@ -8,8 +8,8 @@ The system supports a simple financial insights workflow:
 
 1. Upload a PDF bank statement for a user.
 2. Store the PDF in MinIO.
-3. Simulate OCR by generating transactions for the uploaded statement.
-4. Store the generated transaction payload in local S3-style storage.
+3. Simulate OCR by generating transactions from the uploaded statement.
+4. Store the raw transaction payload in local S3-style storage.
 5. Store only user and bank statement metadata in PostgreSQL.
 6. Categorise transactions.
 7. Aggregate income, expenses, cashflow, category, and monthly summaries.

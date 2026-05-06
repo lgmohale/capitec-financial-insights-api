@@ -24,7 +24,9 @@ app = FastAPI(
         },
         {
             "name": "bank statements",
-            "description": "MinIO-backed PDF statement uploads and metadata creation.",
+            "description": (
+                "MinIO-backed PDF statement uploads and statement metadata creation."
+            ),
         },
         {
             "name": "categories",
