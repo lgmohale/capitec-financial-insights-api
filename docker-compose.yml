@@ -3,7 +3,7 @@ services:
     build: .
     command: sh scripts/start-api.sh
     environment:
-      APP_ENV: development
+      APP_ENV: local
       APP_NAME: capitec-financial-insights-api
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/financial_insights
       REDIS_URL: redis://redis:6379/0
