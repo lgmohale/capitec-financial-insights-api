@@ -314,11 +314,23 @@ Troubleshooting:
 
 ## Run Tests
 
+Run unit tests locally or inside Docker:
+
 ```bash
-docker compose exec api pytest
+pytest tests/unit -q --cov=app --cov-report=term-missing
+docker compose exec api pytest tests/unit -q --cov=app --cov-report=term-missing
 ```
 
-Quality checks:
+Run integration tests with Docker Compose services:
+
+```bash
+docker compose up -d --wait postgres redis minio
+docker compose run --rm api alembic upgrade head
+docker compose run --rm api pytest tests/integration -q
+docker compose down -v
+```
+
+Quality checks inside Docker:
 
 ```bash
 docker compose exec api ruff check .
@@ -336,13 +348,67 @@ pre-commit install
 pre-commit install --hook-type pre-push
 ```
 
-The pre-push hook runs:
+The pre-push hook starts the required Docker services, runs migrations, and runs:
 
 ```bash
-docker compose run --rm api pytest
+docker compose run --rm api pytest tests/unit tests/integration -q
 ```
 
 If tests fail, `git push` is blocked. Keep Docker running before pushing.
+
+## Branching Workflow
+
+GitHub Actions runs on pushes and pull requests for `dev`, `staging`, and `main`.
+
+Expected branch flow:
+
+- Feature branches merge into `dev`.
+- `dev` merges into `staging`.
+- `staging` merges into `main`.
+
+The CI branch-flow validation fails pull requests when:
+
+- The target branch is `main` and the source branch is not `staging`.
+- The target branch is `staging` and the source branch is not `dev`.
+- `main` is being merged into `dev`.
+
+After branch-flow validation passes, CI runs separate jobs:
+
+```bash
+ruff check .
+ruff format --check .
+pytest tests/unit -q --cov=app --cov-report=term-missing
+docker compose config
+docker build -t transaction-aggregation-api:test .
+docker compose run --rm api pytest tests/integration -q
+pip-audit -r requirements.txt --cache-dir .cache/pip-audit
+```
+
+## CI/CD
+
+CI runs on pull requests and pushes to `dev`, `staging`, and `main`. It validates the branch flow and runs practical quality checks:
+
+- Branch flow validation.
+- Ruff lint and format checks.
+- Unit tests with coverage reporting.
+- Docker Compose configuration validation.
+- `.env.example` required-variable validation.
+- Docker image build validation.
+- Docker-backed integration tests with PostgreSQL, Redis, and MinIO.
+- Advisory dependency security scanning with `pip-audit`.
+
+The expected branch flow is:
+
+```text
+feature branch -> dev -> staging -> main
+```
+
+CD runs on pushes to `staging` and `main`.
+
+- `staging` builds and validates `transaction-aggregation-api:staging`.
+- `main` builds and validates `transaction-aggregation-api:latest` and `transaction-aggregation-api:production`.
+
+The CD workflow validates the Docker image and runs unit tests inside the built container. Actual cloud deployment is intentionally out of scope for this assessment.
 
 ## Assumptions
 

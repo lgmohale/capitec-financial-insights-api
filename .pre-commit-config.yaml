@@ -12,8 +12,8 @@ repos:
   - repo: local
     hooks:
       - id: pytest-pre-push
-        name: Run pytest before push
-        entry: docker compose run --rm api pytest -q
+        name: Run unit and integration tests before push
+        entry: bash -c 'docker compose up -d --wait postgres redis minio && docker compose run --rm api alembic upgrade head && docker compose run --rm api pytest tests/unit tests/integration -q'
         language: system
         pass_filenames: false
         stages: [pre-push]
