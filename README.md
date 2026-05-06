@@ -1,6 +1,6 @@
 # Capitec Financial Insights API
 
-FastAPI backend for a transaction aggregation and financial insights system. The API accepts PDF bank statement uploads, stores PDFs in MinIO, stores raw generated transaction data as JSON files, stores only metadata in PostgreSQL, and produces cached financial insights using rule-based processing.
+FastAPI backend for a transaction aggregation and financial insights system. The API accepts PDF bank statement uploads, stores PDFs and generated JSON outputs in MinIO, stores only metadata in PostgreSQL, and produces cached financial insights using rule-based processing.
 
 ## Project Overview
 
@@ -9,7 +9,7 @@ The system supports a simple financial insights workflow:
 1. Upload a PDF bank statement for a user.
 2. Store the PDF in MinIO.
 3. Simulate OCR by generating transactions from the uploaded statement.
-4. Store the raw transaction payload in local S3-style storage.
+4. Store the generated transaction JSON in MinIO.
 5. Store only user and bank statement metadata in PostgreSQL.
 6. Categorise transactions.
 7. Aggregate income, expenses, cashflow, category, and monthly summaries.
@@ -22,9 +22,7 @@ The system supports a simple financial insights workflow:
 - FastAPI API service
 - PostgreSQL for metadata only
 - Redis to simulate AWS ElastiCache
-- MinIO to simulate S3-style PDF bank statement storage
-- `data/input` as a local S3 input bucket simulation
-- `data/output` as a local S3 output bucket simulation
+- MinIO to simulate S3-style object storage for statement PDFs and generated JSON outputs
 - Docker Compose for local API, PostgreSQL, Redis, and MinIO services
 - Alembic for database migrations
 - Pytest, Ruff, pre-commit, and GitHub Actions for quality checks
@@ -52,9 +50,9 @@ MINIO_BUCKET=bank-statements
 MINIO_USE_SSL=false
 ```
 
-## MinIO Setup
+## MinIO Object Storage
 
-MinIO simulates S3 for uploaded PDF bank statements. Docker Compose starts MinIO with:
+MinIO simulates S3-compatible storage for uploaded PDF bank statements, generated transaction JSON, and processed insight outputs. Docker Compose starts MinIO with:
 
 - API endpoint: `http://localhost:9000`
 - Console URL: `http://localhost:9001`
@@ -62,37 +60,26 @@ MinIO simulates S3 for uploaded PDF bank statements. Docker Compose starts MinIO
 - Default secret key: `minioadmin`
 - Default bucket: `bank-statements`
 
-The API checks for the configured bucket before upload and creates it when needed. Uploaded PDFs are stored with a generated object reference:
+The API checks for the configured bucket before upload and creates it when needed. Files are stored in the configured bucket using object keys.
+
+Object key examples:
 
 ```text
-bank-statements/{user_id}/{statement_id}.pdf
+input/{user_id}/{statement_id}.pdf
+output/{statement_id}/transactions.json
+output/{statement_id}/categories.json
+output/{statement_id}/aggregation.json
+output/{statement_id}/risk.json
+output/{statement_id}/recommendations.json
 ```
+
+Uploaded PDFs and generated JSON files are not written to project folders.
 
 ## Storage Design
 
-Raw transactions are intentionally stored as JSON files instead of PostgreSQL rows. This keeps the database focused on relational metadata while allowing transaction payloads to remain file/object based, similar to storing bank extracts in S3.
+Raw transactions are intentionally stored as JSON objects in MinIO instead of PostgreSQL rows. This keeps the database focused on relational metadata while allowing transaction payloads to remain object based, similar to storing bank extracts in S3.
 
 This design is useful because transaction payloads can be large, schema-flexible, and better suited to object storage. PostgreSQL stores only the metadata required to locate and relate the file.
-
-## Local S3 Folders
-
-- `data/input`: stores raw transaction files using `{statement_id}.json`
-- `data/output`: stores processed outputs, such as categorisation, aggregation, risk, and recommendation results
-
-Example input file:
-
-```text
-data/input/550e8400-e29b-41d4-a716-446655440000.json
-```
-
-Example output files:
-
-```text
-data/output/{account_id}_categories.json
-data/output/{account_id}_aggregation.json
-data/output/{account_id}_risk.json
-data/output/{account_id}_recommendations.json
-```
 
 ## PostgreSQL Metadata-Only Design
 
@@ -116,7 +103,7 @@ PostgreSQL does not store full transactions. It stores only users and uploaded b
 | `id` | UUID | Primary key, uploaded statement and transaction file ID |
 | `user_id` | UUID | Foreign key to `users.id` |
 | `bank_name` | string | Uploaded bank statement name or bank name |
-| `file_url` | string | MinIO bucket/object reference for the uploaded PDF |
+| `file_url` | string | MinIO object key for the uploaded PDF |
 | `created_at` | datetime | Creation timestamp |
 
 ## Redis Caching
@@ -175,19 +162,21 @@ Example response:
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "user_id": "650e8400-e29b-41d4-a716-446655440000",
   "bank_name": "FNB Statement April 2026",
-  "file_url": "bank-statements/650e8400-e29b-41d4-a716-446655440000/550e8400-e29b-41d4-a716-446655440000.pdf",
+  "file_url": "input/650e8400-e29b-41d4-a716-446655440000/550e8400-e29b-41d4-a716-446655440000.pdf",
+  "bank_statement_pdf_download_url": "http://localhost:8000/api/v1/bank-statements/550e8400-e29b-41d4-a716-446655440000/download",
   "message": "Bank statement uploaded successfully and queued for processing."
 }
 ```
 
-The PDF is stored in MinIO, OCR processing is simulated, and the API creates statement metadata plus a random transaction file internally. Internal local file paths are not exposed in the API response.
+The PDF is stored in MinIO, OCR processing is simulated, and the API creates statement metadata plus generated transaction JSON in MinIO. Internal local file paths are not exposed in the API response.
+The `bank_statement_pdf_download_url` field points to an API download route that streams the uploaded PDF from MinIO.
 
 The upload flow is:
 
 1. Store the PDF in MinIO.
 2. Create user metadata.
 3. Reuse the transaction generation logic to simulate extracted transactions.
-4. Create the `bank_statement` metadata row with the MinIO object reference.
+4. Create the `bank_statement` metadata row with the MinIO object key.
 
 Get combined financial insights:
 
@@ -264,7 +253,7 @@ Example aggregation fields:
     "Gambling spend was detected in the analysed period.",
     "Some income transactions could not be categorised and may require review."
   ],
-  "output_file_path": "data/output/550e8400-e29b-41d4-a716-446655440000_aggregation.json"
+  "bank_statement_pdf_download_url": "http://localhost:8000/api/v1/bank-statements/550e8400-e29b-41d4-a716-446655440000/download"
 }
 ```
 
@@ -298,7 +287,7 @@ Open the MinIO console:
 http://localhost:9001
 ```
 
-Use `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` from `.env.example`. The default bucket is `bank-statements` and is created by the API when the first PDF is uploaded.
+Use `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` from `.env.example`. The default bucket is `bank-statements` and is created by the API when the first PDF or JSON output is uploaded.
 
 Stop the stack:
 
@@ -331,7 +320,7 @@ docker compose exec api ruff check .
 docker compose exec api ruff format --check .
 ```
 
-The API flow tests use temporary data folders, a test database, and fake cache hooks. They do not depend on existing local JSON files or a running Redis service.
+The API flow tests use a test database plus fake object storage and cache hooks. They do not depend on existing local JSON files, MinIO, or a running Redis service.
 
 ## Git Hooks
 
@@ -355,14 +344,13 @@ If tests fail, `git push` is blocked. Keep Docker running before pushing.
 - PDF statement upload stores the original file in MinIO and simulates OCR; no real PDF parsing is performed.
 - Statement transaction histories are randomly generated and include more than 3 months of data, salary, deposits, withdrawals, and at least 7 transactions per week.
 - Categorisation, risk scoring, and recommendations are rule-based.
-- MinIO simulates S3 storage for uploaded PDF bank statements.
-- Local `data/input` and `data/output` folders simulate S3-style transaction input and processed output buckets.
+- MinIO simulates S3 storage for uploaded PDF bank statements and generated JSON outputs.
 - Redis is used only for processed insight caching.
 - PostgreSQL stores metadata only, never full transaction payloads.
 
 ## Production Improvements
 
-- Replace local folders with S3 buckets and object lifecycle policies.
+- Replace local MinIO with managed S3 buckets and object lifecycle policies.
 - Add authentication, authorization, and tenant isolation.
 - Add request validation for duplicate statement uploads and idempotency.
 - Add database constraints and indexes for lookup patterns.

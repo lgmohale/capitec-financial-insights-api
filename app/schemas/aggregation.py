@@ -80,8 +80,9 @@ class AggregationResponse(BaseModel):
                     "Net cashflow remained positive across all analysed months.",
                     "Gambling spend was detected in the analysed period.",
                 ],
-                "output_file_path": (
-                    "data/output/550e8400-e29b-41d4-a716-446655440000_aggregation.json"
+                "bank_statement_pdf_download_url": (
+                    "http://localhost:8000/api/v1/bank-statements/"
+                    "550e8400-e29b-41d4-a716-446655440000/download"
                 ),
             }
         }
@@ -102,4 +103,4 @@ class AggregationResponse(BaseModel):
     monthly_summary: dict[str, MonthlySummaryItem]
     risk_flags: AggregationRiskFlags
     insights: list[str]
-    output_file_path: str
+    bank_statement_pdf_download_url: str = ""

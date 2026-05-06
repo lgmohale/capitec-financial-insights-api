@@ -13,8 +13,8 @@ app = FastAPI(
     version="0.1.0",
     description=(
         "FastAPI backend for MinIO PDF statement uploads, metadata-only "
-        "PostgreSQL storage, local S3-style transaction files, Redis-backed "
-        "insight caching, and rule-based financial insights."
+        "PostgreSQL storage, MinIO-backed generated transaction JSON, "
+        "Redis-backed insight caching, and rule-based financial insights."
     ),
     contact={"name": "Capitec Financial Insights API Submission"},
     openapi_tags=[

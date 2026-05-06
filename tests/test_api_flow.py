@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from pathlib import Path
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -23,15 +22,13 @@ from app.storage import transactions
 
 
 def test_complete_api_flow(tmp_path, monkeypatch) -> None:
-    input_dir = tmp_path / "data" / "input"
-    output_dir = tmp_path / "data" / "output"
-    configure_temp_storage(monkeypatch, input_dir, output_dir)
+    object_store = configure_fake_object_storage(monkeypatch)
     configure_fake_cache(monkeypatch)
     monkeypatch.setattr(
         bank_statement_service,
         "upload_statement_pdf",
         lambda user_id, statement_id, file, content: (
-            f"bank-statements/{user_id}/{statement_id}.pdf"
+            f"input/{user_id}/{statement_id}.pdf"
         ),
     )
 
@@ -81,14 +78,21 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         account_id = upload_payload["id"]
         assert upload_payload["user_id"]
         assert upload_payload["bank_name"] == "FNB Statement April 2026"
-        assert upload_payload["file_url"] == (
-            f"bank-statements/{upload_payload['user_id']}/{account_id}.pdf"
+        assert (
+            upload_payload["file_url"]
+            == f"input/{upload_payload['user_id']}/{account_id}.pdf"
         )
         assert upload_payload["message"] == (
             "Bank statement uploaded successfully and queued for processing."
         )
+        expected_download_url = (
+            f"http://testserver/api/v1/bank-statements/{account_id}/download"
+        )
+        assert (
+            upload_payload["bank_statement_pdf_download_url"] == expected_download_url
+        )
         assert "transaction_file_path" not in upload_payload
-        assert (input_dir / f"{account_id}.json").exists()
+        assert f"output/{account_id}/transactions.json" in object_store
         with testing_session_local() as db:
             bank_statement = db.scalar(
                 select(BankStatement).where(BankStatement.id == UUID(account_id))
@@ -106,7 +110,11 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
             item["category"]: item for item in categories_payload["category_summary"]
         }
         assert summary_by_category["salary"]["transaction_count"] >= 1
-        assert Path(categories_payload["output_file_path"]).exists()
+        assert categories_payload["bank_statement_pdf_download_url"] == (
+            expected_download_url
+        )
+        assert f"output/{account_id}/categories.json" in object_store
+        assert "output_object_key" not in categories_payload
 
         aggregation_response = client.get(f"/api/v1/accounts/{account_id}/aggregation")
         assert aggregation_response.status_code == 200
@@ -127,14 +135,20 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert "savings_rate" in next(
             iter(aggregation_payload["monthly_summary"].values())
         )
-        assert Path(aggregation_payload["output_file_path"]).exists()
+        assert aggregation_payload["bank_statement_pdf_download_url"] == (
+            expected_download_url
+        )
+        assert f"output/{account_id}/aggregation.json" in object_store
+        assert "output_object_key" not in aggregation_payload
 
         risk_response = client.get(f"/api/v1/accounts/{account_id}/risk")
         assert risk_response.status_code == 200
         risk_payload = risk_response.json()
         assert risk_payload["cached"] is False
         assert risk_payload["risk_band"] in {"LOW_RISK", "MEDIUM_RISK", "HIGH_RISK"}
-        assert Path(risk_payload["output_file_path"]).exists()
+        assert risk_payload["bank_statement_pdf_download_url"] == expected_download_url
+        assert f"output/{account_id}/risk.json" in object_store
+        assert "output_object_key" not in risk_payload
 
         recommendations_response = client.get(
             f"/api/v1/accounts/{account_id}/recommendations"
@@ -143,7 +157,11 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         recommendations_payload = recommendations_response.json()
         assert recommendations_payload["cached"] is False
         assert recommendations_payload["recommendations"]
-        assert Path(recommendations_payload["output_file_path"]).exists()
+        assert recommendations_payload["bank_statement_pdf_download_url"] == (
+            expected_download_url
+        )
+        assert f"output/{account_id}/recommendations.json" in object_store
+        assert "output_object_key" not in recommendations_payload
 
         insights_response = client.get(
             f"/api/v1/accounts/{account_id}/financial-insights"
@@ -156,20 +174,36 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert insights_payload["aggregation"]["cached"] is True
         assert insights_payload["risk"]["cached"] is True
         assert insights_payload["recommendations"]["cached"] is True
+        assert insights_payload["aggregation"]["bank_statement_pdf_download_url"] == (
+            expected_download_url
+        )
         assert insights_payload["generated_at"]
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
 
 
-def configure_temp_storage(monkeypatch, input_dir: Path, output_dir: Path) -> None:
-    monkeypatch.setattr(transactions, "INPUT_DIR", input_dir)
-    monkeypatch.setattr(transactions, "OUTPUT_DIR", output_dir)
-    monkeypatch.setattr(categorisation_service, "INPUT_DIR", input_dir)
-    monkeypatch.setattr(categorisation_service, "OUTPUT_DIR", output_dir)
-    monkeypatch.setattr(aggregation_service, "OUTPUT_DIR", output_dir)
-    monkeypatch.setattr(risk_service, "OUTPUT_DIR", output_dir)
-    monkeypatch.setattr(recommendation_service, "OUTPUT_DIR", output_dir)
+def configure_fake_object_storage(monkeypatch) -> dict:
+    object_store = {}
+
+    def upload_json_object(object_key: str, value: dict | list) -> str:
+        object_store[object_key] = value
+        return object_key
+
+    def read_json_object(object_key: str) -> dict | list:
+        return object_store[object_key]
+
+    monkeypatch.setattr(transactions, "upload_json_object", upload_json_object)
+    monkeypatch.setattr(transactions, "read_json_object", read_json_object)
+    for service in (
+        categorisation_service,
+        aggregation_service,
+        risk_service,
+        recommendation_service,
+    ):
+        monkeypatch.setattr(service, "upload_json_object", upload_json_object)
+
+    return object_store
 
 
 def configure_fake_cache(monkeypatch) -> None:

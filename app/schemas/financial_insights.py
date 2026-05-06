@@ -26,7 +26,7 @@ class FinancialInsightsResponse(BaseModel):
                     "id": "550e8400-e29b-41d4-a716-446655440000",
                     "bank_name": "FNB Statement April 2026",
                     "file_url": (
-                        "bank-statements/650e8400-e29b-41d4-a716-446655440000/"
+                        "input/650e8400-e29b-41d4-a716-446655440000/"
                         "550e8400-e29b-41d4-a716-446655440000.pdf"
                     ),
                     "created_at": "2026-05-05T10:00:00Z",
@@ -71,7 +71,10 @@ class FinancialInsightsResponse(BaseModel):
                         "Salary income appears consistent across the analysed period.",
                         "Gambling spend was detected in the analysed period.",
                     ],
-                    "output_file_path": "data/output/example_aggregation.json",
+                    "bank_statement_pdf_download_url": (
+                        "http://localhost:8000/api/v1/bank-statements/"
+                        "550e8400-e29b-41d4-a716-446655440000/download"
+                    ),
                 },
                 "risk": {
                     "account_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -94,7 +97,10 @@ class FinancialInsightsResponse(BaseModel):
                         "Medium lending risk. Consider lower exposure or "
                         "additional checks."
                     ),
-                    "output_file_path": "data/output/example_risk.json",
+                    "bank_statement_pdf_download_url": (
+                        "http://localhost:8000/api/v1/bank-statements/"
+                        "550e8400-e29b-41d4-a716-446655440000/download"
+                    ),
                 },
                 "recommendations": {
                     "account_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -105,7 +111,10 @@ class FinancialInsightsResponse(BaseModel):
                         "Pause gambling transactions and redirect funds to savings."
                     ],
                     "positive_observations": ["Cashflow is positive."],
-                    "output_file_path": "data/output/example_recommendations.json",
+                    "bank_statement_pdf_download_url": (
+                        "http://localhost:8000/api/v1/bank-statements/"
+                        "550e8400-e29b-41d4-a716-446655440000/download"
+                    ),
                 },
                 "generated_at": "2026-05-05T10:05:00Z",
             }

@@ -24,7 +24,7 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
         user_id=USER_ID,
         id=ACCOUNT_ID,
         bank_name="FNB Statement April 2026",
-        file_url=f"bank-statements/{USER_ID}/{ACCOUNT_ID}.pdf",
+        file_url=f"input/{USER_ID}/{ACCOUNT_ID}.pdf",
         created_at=datetime(2026, 5, 5, tzinfo=timezone.utc),  # noqa: UP017
     )
     db = FakeSession([bank_statement, user])
@@ -55,7 +55,7 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
             insights=[
                 "Salary income appears consistent across the analysed period.",
             ],
-            output_file_path="data/output/aggregation.json",
+            bank_statement_pdf_download_url="",
         ),
     )
     monkeypatch.setattr(
@@ -79,7 +79,7 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
                 "triggered_rules": [],
             },
             recommendation="Low risk.",
-            output_file_path="data/output/risk.json",
+            bank_statement_pdf_download_url="",
         ),
     )
     monkeypatch.setattr(
@@ -92,7 +92,7 @@ def test_build_financial_insights_reuses_existing_services(monkeypatch) -> None:
             recommendations=["Build emergency savings."],
             priority_actions=["Keep monitoring spending monthly."],
             positive_observations=["Cashflow is positive."],
-            output_file_path="data/output/recommendations.json",
+            bank_statement_pdf_download_url="",
         ),
     )
 

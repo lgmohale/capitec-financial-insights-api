@@ -1,12 +1,11 @@
-import json
-from pathlib import Path
 from uuid import UUID
 
 from app.core.cache import get_cache, set_cache
 from app.schemas.recommendations import RecommendationsResponse
 from app.services.aggregation_service import aggregate_account_transactions
 from app.services.risk_service import score_account_risk
-from app.storage.transactions import OUTPUT_DIR
+from app.storage.object_storage import upload_json_object
+from app.storage.transactions import processed_output_object_key
 
 
 def build_account_recommendations(
@@ -29,14 +28,10 @@ def build_account_recommendations(
         aggregation=aggregation.model_dump(mode="json"),
         risk=risk.model_dump(mode="json"),
     )
-    output_file_path = write_recommendations_output(
-        account_id,
-        recommendation_result,
-    )
+    write_recommendations_output(account_id, recommendation_result)
     result = RecommendationsResponse(
         account_id=account_id,
         cached=False,
-        output_file_path=str(output_file_path),
         **recommendation_result,
     )
 
@@ -168,18 +163,12 @@ def safe_ratio(numerator: float, denominator: float) -> float:
 def write_recommendations_output(
     account_id: UUID,
     recommendation_result: dict,
-) -> Path:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_file_path = OUTPUT_DIR / f"{account_id}_recommendations.json"
-    output_file_path.write_text(
-        json.dumps(
-            {
-                "account_id": str(account_id),
-                **recommendation_result,
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+) -> str:
+    object_key = processed_output_object_key(account_id, "recommendations")
+    return upload_json_object(
+        object_key=object_key,
+        value={
+            "account_id": str(account_id),
+            **recommendation_result,
+        },
     )
-    return output_file_path

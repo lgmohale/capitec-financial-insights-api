@@ -42,8 +42,9 @@ class RiskResponse(BaseModel):
                 "recommendation": (
                     "Medium lending risk. Consider lower exposure or additional checks."
                 ),
-                "output_file_path": (
-                    "data/output/550e8400-e29b-41d4-a716-446655440000_risk.json"
+                "bank_statement_pdf_download_url": (
+                    "http://localhost:8000/api/v1/bank-statements/"
+                    "550e8400-e29b-41d4-a716-446655440000/download"
                 ),
             }
         }
@@ -55,4 +56,4 @@ class RiskResponse(BaseModel):
     risk_band: RiskBand
     risk_factors: RiskFactors
     recommendation: str
-    output_file_path: str
+    bank_statement_pdf_download_url: str = ""
