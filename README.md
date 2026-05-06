@@ -4,6 +4,11 @@ FastAPI backend for a transaction aggregation and financial insights system. The
 
 ## Project Overview
 
+This project combines two assessment ideas:
+
+1. Transaction Aggregation API as the main assessment brief.
+2. Secure File Statement Delivery concepts through PDF upload, MinIO storage, and secure statement handling.
+
 The system supports a simple financial insights workflow:
 
 1. Upload a PDF bank statement for a user.
@@ -348,15 +353,17 @@ If tests fail, `git push` is blocked. Keep Docker running before pushing.
 - Redis is used only for processed insight caching.
 - PostgreSQL stores metadata only, never full transaction payloads.
 
-## Production Improvements
+## Possible Improvements
 
-- Replace local MinIO with managed S3 buckets and object lifecycle policies.
-- Add authentication, authorization, and tenant isolation.
-- Add request validation for duplicate statement uploads and idempotency.
-- Add database constraints and indexes for lookup patterns.
-- Use managed PostgreSQL and ElastiCache.
-- Add structured logging, tracing, metrics, and alerting.
-- Move long-running processing to background jobs or event-driven workers.
-- Encrypt sensitive data at rest and in transit.
-- Add CI database migration checks and contract tests.
-- Replace simple rules with versioned models or configurable rule engines.
+This project focuses on the assessment requirements: transaction aggregation, categorisation, financial summaries, and secure statement file handling using MinIO as S3-compatible storage.
+
+Given more time, the following improvements could be added:
+
+- Add authentication so users can only access their own statements and summaries.
+- Add time-limited pre-signed download links for uploaded PDF statements.
+- Improve transaction categorisation with configurable rules instead of hardcoded categories.
+- Add duplicate statement detection to avoid processing the same file more than once.
+- Move statement processing to a background job for larger files.
+- Add more detailed API filtering, for example by date range, category, or transaction type.
+- Add more test coverage for edge cases such as empty statements, invalid files, and zero-income months.
+- Add basic monitoring and structured logs for easier debugging.
