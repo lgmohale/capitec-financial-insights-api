@@ -7,3 +7,7 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "unit: fast isolated tests",
+  "integration: tests requiring Docker services like Postgres or MinIO",
+]
