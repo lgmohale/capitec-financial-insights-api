@@ -9,28 +9,21 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.dependencies import get_db
-from app.db.models import BankStatement, Base
+from app.api.v1 import bank_statements
+from app.db.models import Base, UploadedStatement
 from app.main import app
 from app.services import (
     aggregation_service,
     bank_statement_service,
     categorisation_service,
-    recommendation_service,
     risk_service,
 )
 from app.storage import transactions
 
 
-def test_complete_api_flow(tmp_path, monkeypatch) -> None:
+def test_complete_api_flow(monkeypatch) -> None:
     object_store = configure_fake_object_storage(monkeypatch)
     configure_fake_cache(monkeypatch)
-    monkeypatch.setattr(
-        bank_statement_service,
-        "upload_statement_pdf",
-        lambda user_id, statement_id, file, content: (
-            f"input/{user_id}/{statement_id}.pdf"
-        ),
-    )
 
     engine = create_engine(
         "sqlite://",
@@ -60,65 +53,66 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert health_response.json() == {"status": "ok"}
 
         upload_response = client.post(
-            "/api/v1/bank-statements/upload",
-            data={
-                "user_names": "Lucas George",
-                "bank_name": "FNB Statement April 2026",
-            },
+            "/api/v1/bank-statement/uplaod",
+            data={"bank_name": "Capitec"},
             files={
                 "file": (
                     "statement.pdf",
-                    b"%PDF-1.4 simulated statement",
+                    b"%PDF-1.4 simulated bank statement",
                     "application/pdf",
                 )
             },
         )
         assert upload_response.status_code == 201
         upload_payload = upload_response.json()
-        account_id = upload_payload["id"]
-        assert upload_payload["user_id"]
-        assert upload_payload["bank_name"] == "FNB Statement April 2026"
-        assert (
-            upload_payload["file_url"]
-            == f"input/{upload_payload['user_id']}/{account_id}.pdf"
+        uploaded_statement = upload_payload["uploaded_statement"]
+        statement_id = uploaded_statement["id"]
+
+        assert uploaded_statement["bank_name"] == "Capitec"
+        assert uploaded_statement["object_key"] == f"input/{statement_id}/statement.pdf"
+        assert upload_payload["download_url"] == (
+            f"http://testserver/api/v1/bank-statement/{statement_id}/download"
         )
         assert upload_payload["message"] == (
-            "Bank statement uploaded successfully and queued for processing."
+            "Bank statement uploaded successfully and processed with simulated OCR."
         )
-        expected_download_url = (
-            f"http://testserver/api/v1/bank-statements/{account_id}/download"
-        )
-        assert (
-            upload_payload["bank_statement_pdf_download_url"] == expected_download_url
-        )
-        assert "transaction_file_path" not in upload_payload
-        assert f"output/{account_id}/transactions.json" in object_store
-        with testing_session_local() as db:
-            bank_statement = db.scalar(
-                select(BankStatement).where(BankStatement.id == UUID(account_id))
-            )
-        assert bank_statement is not None
-        assert str(bank_statement.user_id) == upload_payload["user_id"]
-        assert bank_statement.bank_name == "FNB Statement April 2026"
-        assert bank_statement.file_url == upload_payload["file_url"]
+        assert f"input/{statement_id}/statement.pdf" in object_store
+        assert f"input/{statement_id}/transactions.json" in object_store
 
-        categories_response = client.get(f"/api/v1/accounts/{account_id}/categories")
+        with testing_session_local() as db:
+            saved_statement = db.scalar(
+                select(UploadedStatement).where(
+                    UploadedStatement.id == UUID(statement_id)
+                )
+            )
+        assert saved_statement is not None
+        assert saved_statement.bank_name == "Capitec"
+        assert saved_statement.object_key == uploaded_statement["object_key"]
+
+        download_response = client.get(
+            f"/api/v1/bank-statement/{statement_id}/download"
+        )
+        assert download_response.status_code == 200
+        assert download_response.headers["content-type"] == "application/pdf"
+        assert download_response.content == b"%PDF-1.4 simulated bank statement"
+
+        categories_response = client.get(f"/api/v1/accounts/{statement_id}/categories")
         assert categories_response.status_code == 200
         categories_payload = categories_response.json()
+        assert categories_payload["statement_id"] == statement_id
         assert categories_payload["cached"] is False
         summary_by_category = {
             item["category"]: item for item in categories_payload["category_summary"]
         }
         assert summary_by_category["salary"]["transaction_count"] >= 1
-        assert categories_payload["bank_statement_pdf_download_url"] == (
-            expected_download_url
-        )
-        assert f"output/{account_id}/categories.json" in object_store
-        assert "output_object_key" not in categories_payload
+        assert f"output/{statement_id}/categories.json" in object_store
 
-        aggregation_response = client.get(f"/api/v1/accounts/{account_id}/aggregation")
+        aggregation_response = client.get(
+            f"/api/v1/accounts/{statement_id}/aggregation"
+        )
         assert aggregation_response.status_code == 200
         aggregation_payload = aggregation_response.json()
+        assert aggregation_payload["statement_id"] == statement_id
         assert aggregation_payload["cached"] is False
         assert aggregation_payload["total_income"] > 0
         assert aggregation_payload["total_expenses"] > 0
@@ -135,49 +129,15 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
         assert "savings_rate" in next(
             iter(aggregation_payload["monthly_summary"].values())
         )
-        assert aggregation_payload["bank_statement_pdf_download_url"] == (
-            expected_download_url
-        )
-        assert f"output/{account_id}/aggregation.json" in object_store
-        assert "output_object_key" not in aggregation_payload
+        assert f"output/{statement_id}/aggregation.json" in object_store
 
-        risk_response = client.get(f"/api/v1/accounts/{account_id}/risk")
+        risk_response = client.get(f"/api/v1/accounts/{statement_id}/risk")
         assert risk_response.status_code == 200
         risk_payload = risk_response.json()
+        assert risk_payload["statement_id"] == statement_id
         assert risk_payload["cached"] is False
         assert risk_payload["risk_band"] in {"LOW_RISK", "MEDIUM_RISK", "HIGH_RISK"}
-        assert risk_payload["bank_statement_pdf_download_url"] == expected_download_url
-        assert f"output/{account_id}/risk.json" in object_store
-        assert "output_object_key" not in risk_payload
-
-        recommendations_response = client.get(
-            f"/api/v1/accounts/{account_id}/recommendations"
-        )
-        assert recommendations_response.status_code == 200
-        recommendations_payload = recommendations_response.json()
-        assert recommendations_payload["cached"] is False
-        assert recommendations_payload["recommendations"]
-        assert recommendations_payload["bank_statement_pdf_download_url"] == (
-            expected_download_url
-        )
-        assert f"output/{account_id}/recommendations.json" in object_store
-        assert "output_object_key" not in recommendations_payload
-
-        insights_response = client.get(
-            f"/api/v1/accounts/{account_id}/financial-insights"
-        )
-        assert insights_response.status_code == 200
-        insights_payload = insights_response.json()
-        assert insights_payload["account_id"] == account_id
-        assert insights_payload["user"]["name"] == "Lucas George"
-        assert insights_payload["bank_statement"]["id"] == account_id
-        assert insights_payload["aggregation"]["cached"] is True
-        assert insights_payload["risk"]["cached"] is True
-        assert insights_payload["recommendations"]["cached"] is True
-        assert insights_payload["aggregation"]["bank_statement_pdf_download_url"] == (
-            expected_download_url
-        )
-        assert insights_payload["generated_at"]
+        assert f"output/{statement_id}/risk.json" in object_store
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
@@ -186,6 +146,14 @@ def test_complete_api_flow(tmp_path, monkeypatch) -> None:
 def configure_fake_object_storage(monkeypatch) -> dict:
     object_store = {}
 
+    def upload_bytes_object(
+        object_key: str,
+        content: bytes,
+        content_type: str,
+    ) -> str:
+        object_store[object_key] = content
+        return object_key
+
     def upload_json_object(object_key: str, value: dict | list) -> str:
         object_store[object_key] = value
         return object_key
@@ -193,13 +161,21 @@ def configure_fake_object_storage(monkeypatch) -> dict:
     def read_json_object(object_key: str) -> dict | list:
         return object_store[object_key]
 
+    def read_bytes_object(object_key: str) -> bytes:
+        return object_store[object_key]
+
     monkeypatch.setattr(transactions, "upload_json_object", upload_json_object)
     monkeypatch.setattr(transactions, "read_json_object", read_json_object)
+    monkeypatch.setattr(
+        bank_statement_service,
+        "upload_bytes_object",
+        upload_bytes_object,
+    )
+    monkeypatch.setattr(bank_statements, "read_bytes_object", read_bytes_object)
     for service in (
         categorisation_service,
         aggregation_service,
         risk_service,
-        recommendation_service,
     ):
         monkeypatch.setattr(service, "upload_json_object", upload_json_object)
 
@@ -219,7 +195,6 @@ def configure_fake_cache(monkeypatch) -> None:
         categorisation_service,
         aggregation_service,
         risk_service,
-        recommendation_service,
     ):
         monkeypatch.setattr(service, "get_cache", get_cache)
         monkeypatch.setattr(service, "set_cache", set_cache)

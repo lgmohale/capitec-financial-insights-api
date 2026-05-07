@@ -87,4 +87,4 @@ def get_normalized_path(request: Request) -> str:
     if route_template:
         return route_template
 
-    return UUID_PATH_SEGMENT_PATTERN.sub("/{uuid}", request.url.path)
+    return UUID_PATH_SEGMENT_PATTERN.sub("/{id}", request.url.path)

@@ -1,83 +1,73 @@
 from contextlib import suppress
 from uuid import UUID, uuid4
 
-from fastapi import UploadFile
+from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger
-from app.core.metrics import (
-    BANK_STATEMENT_UPLOAD_FAILURES,
-    BANK_STATEMENT_UPLOADS,
-    PROCESSING_FAILURES,
+from app.db.models import UploadedStatement
+from app.schemas.bank_statements import (
+    UploadBankStatementResponse,
+    UploadedStatementMetadata,
 )
-from app.db.models import BankStatement, User
-from app.schemas.bank_statements import UploadStatementResponse
-from app.storage.object_storage import delete_object
-from app.storage.statements import upload_statement_pdf
+from app.storage.object_storage import delete_object, upload_bytes_object
 from app.storage.transactions import write_starter_transactions
 
-SUCCESS_MESSAGE = "Bank statement uploaded successfully and queued for processing."
+SUCCESS_MESSAGE = (
+    "Bank statement uploaded successfully and processed with simulated OCR."
+)
 logger = get_logger(__name__)
 
 
-async def upload_and_process_bank_statement(
-    user_names: str,
+def upload_bank_statement_record(
     bank_name: str,
-    file: UploadFile,
+    filename: str,
+    content_type: str,
+    content: bytes,
     db: Session,
-) -> UploadStatementResponse:
-    user_id = uuid4()
+) -> UploadBankStatementResponse:
+    validate_pdf_upload(filename=filename, content_type=content_type, content=content)
     statement_id = uuid4()
-    user = User(id=user_id, name=user_names)
+    pdf_object_key = pdf_statement_object_key(statement_id)
     created_object_keys = []
     try:
         logger.info(
-            "Upload started",
+            "Bank statement upload started",
             extra={
-                "user_id": str(user_id),
-                "bank_statement_id": str(statement_id),
-                "event_name": "upload_started",
+                "statement_id": str(statement_id),
+                "event_name": "bank_statement_upload_started",
             },
         )
-        file_url = upload_statement_pdf(
-            user_id=user_id,
-            statement_id=statement_id,
-            file=file,
-            content=await file.read(),
+        upload_bytes_object(
+            object_key=pdf_object_key,
+            content=content,
+            content_type="application/pdf",
         )
-        created_object_keys.append(file_url)
-
+        created_object_keys.append(pdf_object_key)
         logger.info(
             "Simulated OCR processing started",
             extra={
-                "user_id": str(user_id),
-                "bank_statement_id": str(statement_id),
-                "event_name": "processing_started",
+                "statement_id": str(statement_id),
+                "event_name": "simulated_ocr_processing_started",
             },
         )
         transaction_object_key = write_starter_transactions(statement_id)
         created_object_keys.append(transaction_object_key)
-
-        bank_statement = BankStatement(
+        uploaded_statement = UploadedStatement(
             id=statement_id,
-            user_id=user_id,
             bank_name=bank_name,
-            file_url=file_url,
+            object_key=pdf_object_key,
         )
-        db.add(user)
-        db.flush()
-        db.add(bank_statement)
+        db.add(uploaded_statement)
         db.commit()
     except Exception:
         db.rollback()
-        BANK_STATEMENT_UPLOAD_FAILURES.labels("upload_failed").inc()
-        PROCESSING_FAILURES.labels("statement_processing_failed").inc()
         logger.exception(
-            "Upload processing failure",
+            "Bank statement upload failed",
             extra={
-                "user_id": str(user_id),
-                "bank_statement_id": str(statement_id),
-                "event_name": "upload_failure",
+                "statement_id": str(statement_id),
+                "event_name": "bank_statement_upload_failed",
             },
         )
         for object_key in created_object_keys:
@@ -85,45 +75,44 @@ async def upload_and_process_bank_statement(
                 delete_object(object_key)
         raise
 
-    db.refresh(bank_statement)
-    BANK_STATEMENT_UPLOADS.labels("upload_completed").inc()
+    db.refresh(uploaded_statement)
     logger.info(
-        "Upload completed",
+        "Bank statement uploaded and processed",
         extra={
-            "user_id": str(user_id),
-            "bank_statement_id": str(statement_id),
-            "event_name": "upload_completed",
+            "statement_id": str(statement_id),
+            "event_name": "bank_statement_upload_completed",
         },
     )
 
-    return UploadStatementResponse(
-        id=bank_statement.id,
-        user_id=bank_statement.user_id,
-        bank_name=bank_statement.bank_name,
-        file_url=bank_statement.file_url,
+    return UploadBankStatementResponse(
+        uploaded_statement=UploadedStatementMetadata.model_validate(uploaded_statement),
         message=SUCCESS_MESSAGE,
     )
 
 
-def save_bank_statement_record(
-    statement_id: UUID,
-    user_id: UUID,
-    bank_name: str,
-    file_url: str,
-    db: Session,
-) -> BankStatement:
-    bank_statement = BankStatement(
-        id=statement_id,
-        user_id=user_id,
-        bank_name=bank_name,
-        file_url=file_url,
+def get_uploaded_statement(statement_id: UUID, db: Session) -> UploadedStatement | None:
+    return db.scalar(
+        select(UploadedStatement).where(UploadedStatement.id == statement_id)
     )
-    try:
-        db.add(bank_statement)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
 
-    db.refresh(bank_statement)
-    return bank_statement
+
+def pdf_statement_object_key(statement_id: UUID) -> str:
+    return f"input/{statement_id}/statement.pdf"
+
+
+def validate_pdf_upload(filename: str, content_type: str, content: bytes) -> None:
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF bank statement uploads are supported.",
+        )
+    if content_type and content_type != "application/pdf":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only PDF bank statement uploads are supported.",
+        )
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded bank statement is not a valid PDF.",
+        )

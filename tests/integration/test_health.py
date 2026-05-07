@@ -23,10 +23,10 @@ def test_metrics_endpoint_exposes_prometheus_metrics() -> None:
 
 
 def test_metrics_use_route_template_for_uuid_paths() -> None:
-    account_id = "1b475e51-4be0-4056-b9dd-1e308b2fcd2f"
+    statement_id = "1b475e51-4be0-4056-b9dd-1e308b2fcd2f"
 
-    client.get(f"/api/v1/accounts/{account_id}/aggregation")
+    client.get(f"/api/v1/accounts/{statement_id}/aggregation")
     response = client.get("/metrics")
 
-    assert 'path="/api/v1/accounts/{account_id}/aggregation"' in response.text
-    assert f'path="/api/v1/accounts/{account_id}/aggregation"' not in response.text
+    assert 'path="/api/v1/accounts/{statement_id}/aggregation"' in response.text
+    assert f'path="/api/v1/accounts/{statement_id}/aggregation"' not in response.text

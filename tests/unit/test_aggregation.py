@@ -2,10 +2,10 @@ from uuid import UUID
 
 from app.services import aggregation_service
 
-ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+STATEMENT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
-def test_aggregate_account_transactions_builds_output_and_cache(
+def test_aggregate_statement_transactions_builds_output_and_cache(
     monkeypatch,
 ) -> None:
     cached_values = {}
@@ -14,7 +14,7 @@ def test_aggregate_account_transactions_builds_output_and_cache(
     monkeypatch.setattr(
         aggregation_service,
         "read_transactions",
-        lambda account_id: [
+        lambda statement_id: [
             {
                 "id": "txn-001",
                 "date": "2026-04-25",
@@ -50,7 +50,7 @@ def test_aggregate_account_transactions_builds_output_and_cache(
         lambda key, value: cached_values.update({key: value}),
     )
 
-    response = aggregation_service.aggregate_account_transactions(ACCOUNT_ID)
+    response = aggregation_service.aggregate_statement_transactions(STATEMENT_ID)
 
     assert response.cached is False
     assert response.total_income == 46579.0
@@ -79,19 +79,18 @@ def test_aggregate_account_transactions_builds_output_and_cache(
         "Groceries is the largest expense category.",
         "Net cashflow remained positive across all analysed months.",
     ]
-    assert cached_values[f"aggregation:{ACCOUNT_ID}"]["cached"] is False
+    assert cached_values[f"aggregation:{STATEMENT_ID}"]["cached"] is False
 
-    output_key = f"output/{ACCOUNT_ID}/aggregation.json"
-    assert response.bank_statement_pdf_download_url == ""
+    output_key = f"output/{STATEMENT_ID}/aggregation.json"
     assert output_key in uploaded_objects
 
 
-def test_aggregate_account_transactions_returns_cached_result(monkeypatch) -> None:
+def test_aggregate_statement_transactions_returns_cached_result(monkeypatch) -> None:
     monkeypatch.setattr(
         aggregation_service,
         "get_cache",
         lambda key: {
-            "account_id": str(ACCOUNT_ID),
+            "statement_id": str(STATEMENT_ID),
             "cached": False,
             "total_income": 100.0,
             "total_expenses": 25.0,
@@ -130,16 +129,11 @@ def test_aggregate_account_transactions_returns_cached_result(monkeypatch) -> No
                 "Salary income appears consistent across the analysed period.",
                 "Net cashflow remained positive across all analysed months.",
             ],
-            "bank_statement_pdf_download_url": (
-                f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
-            ),
         },
     )
 
-    response = aggregation_service.aggregate_account_transactions(ACCOUNT_ID)
+    response = aggregation_service.aggregate_statement_transactions(STATEMENT_ID)
 
     assert response.cached is True
     assert response.total_income == 100.0
-    assert response.bank_statement_pdf_download_url == (
-        f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
-    )
+    assert response.statement_id == STATEMENT_ID

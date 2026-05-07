@@ -87,33 +87,33 @@ CREDIT_TEMPLATES = [
 ]
 
 
-def transaction_object_key(bank_statement_id: UUID) -> str:
-    return f"output/{bank_statement_id}/transactions.json"
+def transaction_object_key(statement_id: UUID) -> str:
+    return f"input/{statement_id}/transactions.json"
 
 
-def processed_output_object_key(bank_statement_id: UUID, output_name: str) -> str:
-    return f"output/{bank_statement_id}/{output_name}.json"
+def processed_output_object_key(statement_id: UUID, output_name: str) -> str:
+    return f"output/{statement_id}/{output_name}.json"
 
 
-def write_starter_transactions(bank_statement_id: UUID) -> str:
+def write_starter_transactions(statement_id: UUID) -> str:
     try:
         logger.info(
             "Transaction generation started",
             extra={
-                "bank_statement_id": str(bank_statement_id),
+                "statement_id": str(statement_id),
                 "event_name": "transaction_generation_started",
             },
         )
         transactions = generate_random_transaction_history()
         object_key = upload_json_object(
-            object_key=transaction_object_key(bank_statement_id),
+            object_key=transaction_object_key(statement_id),
             value=transactions,
         )
         TRANSACTION_GENERATION_COMPLETED.labels("generation_completed").inc()
         logger.info(
             "Transaction generation completed",
             extra={
-                "bank_statement_id": str(bank_statement_id),
+                "statement_id": str(statement_id),
                 "event_name": "transaction_generation_completed",
             },
         )
@@ -123,15 +123,15 @@ def write_starter_transactions(bank_statement_id: UUID) -> str:
         logger.exception(
             "Transaction generation failed",
             extra={
-                "bank_statement_id": str(bank_statement_id),
+                "statement_id": str(statement_id),
                 "event_name": "transaction_generation_failed",
             },
         )
         raise
 
 
-def read_starter_transactions(bank_statement_id: UUID) -> list[dict]:
-    return read_json_object(transaction_object_key(bank_statement_id))
+def read_starter_transactions(statement_id: UUID) -> list[dict]:
+    return read_json_object(transaction_object_key(statement_id))
 
 
 def generate_random_transaction_history() -> list[dict]:

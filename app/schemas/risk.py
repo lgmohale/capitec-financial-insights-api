@@ -23,7 +23,7 @@ class RiskResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "account_id": "550e8400-e29b-41d4-a716-446655440000",
+                "statement_id": "550e8400-e29b-41d4-a716-446655440000",
                 "cached": False,
                 "risk_score": 45,
                 "risk_band": "MEDIUM_RISK",
@@ -42,18 +42,13 @@ class RiskResponse(BaseModel):
                 "recommendation": (
                     "Medium lending risk. Consider lower exposure or additional checks."
                 ),
-                "bank_statement_pdf_download_url": (
-                    "http://localhost:8000/api/v1/bank-statements/"
-                    "550e8400-e29b-41d4-a716-446655440000/download"
-                ),
             }
         }
     )
 
-    account_id: UUID
+    statement_id: UUID
     cached: bool
     risk_score: int
     risk_band: RiskBand
     risk_factors: RiskFactors
     recommendation: str
-    bank_statement_pdf_download_url: str = ""
