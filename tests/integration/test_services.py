@@ -1,6 +1,7 @@
 from contextlib import suppress
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,11 @@ from app.storage.object_storage import (
     object_exists,
     read_json_object,
     upload_json_object,
+)
+
+pytestmark = pytest.mark.skipif(
+    get_settings().minio_endpoint != "minio",
+    reason="Docker Compose integration services are not configured.",
 )
 
 
