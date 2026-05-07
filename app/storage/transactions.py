@@ -3,10 +3,16 @@ from collections import Counter
 from datetime import date, timedelta
 from uuid import UUID
 
+from app.core.logging import get_logger
+from app.core.metrics import (
+    TRANSACTION_GENERATION_COMPLETED,
+    TRANSACTION_GENERATION_FAILURES,
+)
 from app.storage.object_storage import read_json_object, upload_json_object
 
 MIN_HISTORY_WEEKS = 14
 MIN_TRANSACTIONS_PER_WEEK = 7
+logger = get_logger(__name__)
 
 STARTER_TRANSACTIONS = [
     {
@@ -90,11 +96,38 @@ def processed_output_object_key(bank_statement_id: UUID, output_name: str) -> st
 
 
 def write_starter_transactions(bank_statement_id: UUID) -> str:
-    transactions = generate_random_transaction_history()
-    return upload_json_object(
-        object_key=transaction_object_key(bank_statement_id),
-        value=transactions,
-    )
+    try:
+        logger.info(
+            "Transaction generation started",
+            extra={
+                "bank_statement_id": str(bank_statement_id),
+                "event_name": "transaction_generation_started",
+            },
+        )
+        transactions = generate_random_transaction_history()
+        object_key = upload_json_object(
+            object_key=transaction_object_key(bank_statement_id),
+            value=transactions,
+        )
+        TRANSACTION_GENERATION_COMPLETED.labels("generation_completed").inc()
+        logger.info(
+            "Transaction generation completed",
+            extra={
+                "bank_statement_id": str(bank_statement_id),
+                "event_name": "transaction_generation_completed",
+            },
+        )
+        return object_key
+    except Exception:
+        TRANSACTION_GENERATION_FAILURES.labels("generation_failed").inc()
+        logger.exception(
+            "Transaction generation failed",
+            extra={
+                "bank_statement_id": str(bank_statement_id),
+                "event_name": "transaction_generation_failed",
+            },
+        )
+        raise
 
 
 def read_starter_transactions(bank_statement_id: UUID) -> list[dict]:

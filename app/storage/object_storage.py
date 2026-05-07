@@ -3,6 +3,10 @@ from io import BytesIO
 from typing import Any
 
 from app.config import get_settings
+from app.core.logging import get_logger
+from app.core.metrics import MINIO_UPLOAD_FAILURES, MINIO_UPLOADS
+
+logger = get_logger(__name__)
 
 
 class MinioObjectStorageService:
@@ -28,15 +32,32 @@ class MinioObjectStorageService:
         content: bytes,
         content_type: str,
     ) -> str:
-        self.ensure_bucket_exists()
-        self.client.put_object(
-            bucket_name=self.bucket_name,
-            object_name=object_key,
-            data=BytesIO(content),
-            length=len(content),
-            content_type=content_type,
-        )
-        return object_key
+        try:
+            logger.info(
+                "MinIO upload started",
+                extra={"event_name": "minio_upload_started"},
+            )
+            self.ensure_bucket_exists()
+            self.client.put_object(
+                bucket_name=self.bucket_name,
+                object_name=object_key,
+                data=BytesIO(content),
+                length=len(content),
+                content_type=content_type,
+            )
+            MINIO_UPLOADS.labels("upload_completed").inc()
+            logger.info(
+                "MinIO upload completed",
+                extra={"event_name": "minio_upload_completed"},
+            )
+            return object_key
+        except Exception:
+            MINIO_UPLOAD_FAILURES.labels("upload_failed").inc()
+            logger.exception(
+                "MinIO upload failed",
+                extra={"event_name": "minio_upload_failed"},
+            )
+            raise
 
     def upload_json(self, object_key: str, value: Any) -> str:
         return self.upload_bytes(

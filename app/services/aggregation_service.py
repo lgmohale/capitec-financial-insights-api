@@ -3,6 +3,8 @@ from typing import Optional
 from uuid import UUID
 
 from app.core.cache import get_cache, set_cache
+from app.core.logging import get_logger
+from app.core.metrics import AGGREGATION_COMPLETED, AGGREGATION_FAILURES
 from app.schemas.aggregation import AggregationResponse
 from app.services.categorisation_service import (
     CATEGORIES,
@@ -13,31 +15,58 @@ from app.storage.object_storage import upload_json_object
 from app.storage.transactions import processed_output_object_key
 
 MONEY_QUANTIZER = Decimal("0.01")
+logger = get_logger(__name__)
 
 
 def aggregate_account_transactions(
     account_id: UUID,
     force_refresh: bool = False,
 ) -> AggregationResponse:
-    cache_key = f"aggregation:{account_id}"
-    if not force_refresh:
-        cached_result = get_cache(cache_key)
-        if cached_result is not None:
-            cached_result["cached"] = True
-            return AggregationResponse(**cached_result)
+    try:
+        logger.info(
+            "Aggregation started",
+            extra={
+                "bank_statement_id": str(account_id),
+                "event_name": "aggregation_started",
+            },
+        )
+        cache_key = f"aggregation:{account_id}"
+        if not force_refresh:
+            cached_result = get_cache(cache_key)
+            if cached_result is not None:
+                cached_result["cached"] = True
+                AGGREGATION_COMPLETED.labels("aggregation_cache_hit").inc()
+                return AggregationResponse(**cached_result)
 
-    transactions = read_transactions(account_id)
-    aggregation = build_aggregation(transactions)
-    write_aggregation_output(account_id, aggregation)
-    result = AggregationResponse(
-        account_id=account_id,
-        cached=False,
-        **aggregation,
-    )
+        transactions = read_transactions(account_id)
+        aggregation = build_aggregation(transactions)
+        write_aggregation_output(account_id, aggregation)
+        result = AggregationResponse(
+            account_id=account_id,
+            cached=False,
+            **aggregation,
+        )
 
-    set_cache(cache_key, result.model_dump(mode="json"))
-
-    return result
+        set_cache(cache_key, result.model_dump(mode="json"))
+        AGGREGATION_COMPLETED.labels("aggregation_completed").inc()
+        logger.info(
+            "Aggregation completed",
+            extra={
+                "bank_statement_id": str(account_id),
+                "event_name": "aggregation_completed",
+            },
+        )
+        return result
+    except Exception:
+        AGGREGATION_FAILURES.labels("aggregation_failed").inc()
+        logger.exception(
+            "Aggregation failed",
+            extra={
+                "bank_statement_id": str(account_id),
+                "event_name": "aggregation_failed",
+            },
+        )
+        raise
 
 
 def build_aggregation(transactions: list[dict]) -> dict:
