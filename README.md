@@ -1,47 +1,47 @@
 # Capitec Transaction Aggregation API
 
-FastAPI backend for a transaction aggregation and lending-risk assessment system. The API uploads PDF bank statements to MinIO, simulates OCR processing and transaction extraction, stores generated transaction JSON and processed outputs in MinIO, stores only uploaded statement metadata in PostgreSQL, and caches processing results in Redis.
+FastAPI backend for a transaction aggregation system. The API uploads PDF bank statements to MinIO, generates sample transaction data, stores metadata in PostgreSQL, and provides categorisation, aggregation, and simple rule-based risk analysis.
 
 ## Project Overview
 
-This project covers the core flow of taking a bank statement, simulating extracted transaction data, categorising it, and producing useful financial summaries and risk signals.
-
-The main flow is:
+This project demonstrates a simplified transaction-processing workflow:
 
 1. Upload a PDF bank statement to MinIO.
-2. Simulate OCR processing by generating a random transaction history for that uploaded statement.
-3. Store the uploaded PDF and generated raw transactions in MinIO object storage.
-4. Store only uploaded statement metadata in PostgreSQL.
-5. Categorise transactions with rule-based keyword matching.
-6. Aggregate income, expenses, cashflow, category, and monthly summaries.
-7. Score lending risk using explainable rules.
-8. Download the uploaded PDF bank statement from MinIO through the API.
+2. Generate sample transaction data for the uploaded statement.
+3. Store uploaded files and generated transaction JSON in MinIO.
+4. Store only statement metadata in PostgreSQL.
+5. Categorise transactions using keyword rules.
+6. Aggregate income, expenses, and monthly summaries.
+7. Generate a simple rule-based lending-risk score.
+8. Download uploaded statements through the API.
 
 ## Architecture
 
 - FastAPI API service
-- PostgreSQL for metadata only
-- MinIO as S3-compatible object storage
-- Redis for processing-result caching
-- Docker Compose for local API, PostgreSQL, Redis, MinIO, and Prometheus services
+- PostgreSQL for metadata storage
+- MinIO for object storage
+- Redis for caching
+- Docker Compose for local development
 - Alembic for database migrations
-- Pytest, Ruff, SonarCloud, pre-commit, and GitHub Actions for quality checks
 
 ## Prerequisites
 
-- Docker and Docker Compose
+- Docker
+- Docker Compose
 
 ## Environment Variables
 
-Docker Compose is intended for local development. Staging and production should use managed PostgreSQL, object storage, and cache services by setting environment-specific values.
+Create a `.env` file using `.env.example`.
 
 Example local configuration:
 
 ```env
-APP_NAME=capitec-financial-insights-api
+APP_NAME=capitec-transaction-aggregation-api
 APP_ENV=local
+
 DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/financial_insights
 REDIS_URL=redis://redis:6379/0
+
 MINIO_ENDPOINT=minio
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=minioadmin
@@ -52,9 +52,9 @@ MINIO_USE_SSL=false
 
 ## Storage Design
 
-PostgreSQL stores metadata only. It does not store raw transactions or processed outputs.
+PostgreSQL stores metadata only. Raw transaction data and processed outputs are stored in MinIO.
 
-MinIO stores object data:
+Example object structure:
 
 ```text
 input/{statement_id}/statement.pdf
@@ -64,42 +64,52 @@ output/{statement_id}/aggregation.json
 output/{statement_id}/risk.json
 ```
 
-No local `data/input` or `data/output` folder is used.
+## Database Design
 
-## Database Table
-
-`bank_statements`
+### `bank_statements`
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | UUID | Primary key |
 | `bank_name` | string | Bank or statement name |
-| `object_key` | string | MinIO key for the uploaded PDF statement |
+| `object_key` | string | MinIO object path for uploaded PDF |
 | `created_at` | datetime | Creation timestamp |
 | `updated_at` | datetime | Update timestamp |
 
 ## Redis Caching
 
-Redis caches processed results as JSON for 3600 seconds by default.
+Redis caches processed results for 3600 seconds by default.
 
 Cache keys:
 
-- `categorisation:{statement_id}`
-- `aggregation:{statement_id}`
-- `risk:{statement_id}`
+```text
+categorisation:{statement_id}
+aggregation:{statement_id}
+risk:{statement_id}
+```
 
-Each processing endpoint supports `force_refresh=false`. Set `force_refresh=true` to bypass Redis and rebuild the result from MinIO data.
+Each processing endpoint supports:
+
+```text
+force_refresh=false
+```
+
+Set `force_refresh=true` to bypass cache and rebuild results.
+
+---
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/health` | Health check |
-| `POST` | `/api/v1/bank-statement/uplaod` | Upload a PDF statement to MinIO and simulate OCR processing |
-| `GET` | `/api/v1/bank-statement/{statement_id}/download` | Download uploaded PDF bank statement |
+| `POST` | `/api/v1/bank-statement/upload` | Upload PDF statement |
+| `GET` | `/api/v1/bank-statement/{statement_id}/download` | Download uploaded PDF |
 | `GET` | `/api/v1/accounts/{statement_id}/categories` | Categorise transactions |
 | `GET` | `/api/v1/accounts/{statement_id}/aggregation` | Aggregate transaction metrics |
-| `GET` | `/api/v1/accounts/{statement_id}/risk` | Generate lending risk score |
+| `GET` | `/api/v1/accounts/{statement_id}/risk` | Generate risk analysis |
+
+## Swagger Documentation
 
 Swagger UI is available at:
 
@@ -111,10 +121,10 @@ Reviewers can test all endpoints directly from Swagger UI.
 
 ## Example Request and Response
 
-Upload a bank statement:
+### Upload a bank statement
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/bank-statement/uplaod \
+curl -X POST http://127.0.0.1:8000/api/v1/bank-statement/upload \
   -F "bank_name=Capitec" \
   -F "file=@statement.pdf;type=application/pdf"
 ```
@@ -130,24 +140,17 @@ Example response:
     "created_at": "2026-05-05T10:00:00Z",
     "updated_at": "2026-05-05T10:00:00Z"
   },
-  "download_url": "http://localhost:8000/api/v1/bank-statement/550e8400-e29b-41d4-a716-446655440000/download",
-  "message": "Bank statement uploaded successfully and processed with simulated OCR."
+  "message": "Statement uploaded successfully."
 }
 ```
 
-Download uploaded PDF statement:
+### Get aggregation summary
 
 ```bash
-curl http://localhost:8000/api/v1/bank-statement/{statement_id}/download
+curl http://127.0.0.1:8000/api/v1/accounts/{statement_id}/aggregation
 ```
 
-Get aggregation:
-
-```bash
-curl http://localhost:8000/api/v1/accounts/{statement_id}/aggregation
-```
-
-Example aggregation fields:
+Example response:
 
 ```json
 {
@@ -177,10 +180,12 @@ The API startup script runs Alembic migrations automatically.
 
 Useful URLs:
 
-- API: `http://localhost:8000`
-- Swagger UI: `http://localhost:8000/docs`
-- MinIO Console: `http://localhost:9001`
-- Prometheus: `http://localhost:9090`
+| Service | URL |
+| --- | --- |
+| API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+| MinIO Console | http://localhost:9001 |
+| Prometheus | http://localhost:9090 |
 
 Default MinIO credentials:
 
@@ -188,7 +193,7 @@ Default MinIO credentials:
 minioadmin / minioadmin
 ```
 
-Open PostgreSQL from the terminal:
+Open PostgreSQL terminal:
 
 ```bash
 docker compose exec postgres psql -U postgres -d financial_insights
@@ -200,75 +205,133 @@ Stop services:
 docker compose down -v
 ```
 
+## Run Locally Without Docker
+
+Create virtual environment:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Copy environment file:
+
+```bash
+cp .env.example .env
+```
+
+Run migrations:
+
+```bash
+alembic upgrade head
+```
+
+Start API:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+PostgreSQL, Redis, and MinIO must already be running locally.
+
 ## Observability
 
-Prometheus scrapes API metrics from `/metrics`.
+Prometheus metrics are exposed through:
 
-Metrics include:
+```text
+/metrics
+```
 
-- `api_requests_total`
-- `api_request_duration_seconds`
-- `minio_uploads_total`
-- `minio_upload_failures_total`
-- `transaction_generation_completed_total`
-- `transaction_generation_failures_total`
-- `aggregation_completed_total`
-- `aggregation_failures_total`
-- `cache_hits_total`
-- `cache_misses_total`
+The API also includes:
 
-API logs are structured JSON and include request IDs for correlation. API responses include `X-Request-ID`.
+- request logging
+- request IDs
+- cache hit/miss metrics
+- aggregation and processing metrics
 
 ## Run Tests
 
-Run unit tests locally or inside Docker:
+Run unit tests:
 
 ```bash
 pytest tests/unit -q --cov=app --cov-report=term-missing --cov-report=xml
-docker compose exec api pytest tests/unit -q --cov=app --cov-report=term-missing --cov-report=xml
 ```
 
-Run integration tests with Docker Compose services:
+Run integration tests:
 
 ```bash
 docker compose up -d --wait postgres redis minio
+
 docker compose run --rm api alembic upgrade head
+
 docker compose run --rm api pytest tests/integration -q
+
 docker compose down -v
 ```
 
-Quality checks:
+---
+
+## Code Quality
+
+Run linting:
 
 ```bash
 ruff check .
+```
+
+Run format checks:
+
+```bash
 ruff format --check .
 ```
 
-## CI/CD
+Install pre-commit hooks:
 
-CI runs on pull requests and pushes to `dev`, `staging`, and `main`.
-
-It includes branch flow validation, Ruff lint and format checks, unit tests with coverage XML, Docker Compose validation, Docker image build validation, Docker-backed integration tests, advisory dependency security scanning, and SonarCloud static analysis.
-
-Expected branch flow:
-
-```text
-feature branch -> dev -> staging -> main
+```bash
+pre-commit install
 ```
 
-CD runs on pushes to `staging` and `main` and validates Docker image builds.
+## CI
+
+GitHub Actions runs:
+
+- Ruff linting
+- Ruff format checks
+- Unit tests
+- Integration tests
+- SonarCloud static analysis
+
+Branch flow used during development:
+
+```text
+feature -> dev -> staging -> main
+```
 
 ## SonarCloud Analysis
 
-SonarCloud static analysis is configured with `sonar-project.properties`.
+SonarCloud uses:
 
-CI generates `coverage.xml` from pytest and uses it in the SonarCloud scan.
+- pytest coverage reports
+- static analysis checks
+- maintainability checks
+
+Coverage is generated during CI using:
+
+```text
+coverage.xml
+```
 
 ## Assumptions
 
-- Bank statement upload stores the PDF in MinIO and simulates OCR processing rather than extracting text from the PDF.
-- Transaction histories are randomly generated and include more than 3 months of data, salary, deposits, withdrawals, and at least 7 transactions per week.
-- Categorisation and risk scoring are rule-based.
+- Uploaded PDFs are stored in MinIO.
+- Transaction histories are generated sample data.
+- Categorisation and risk analysis are rule-based.
 - MinIO simulates S3-compatible object storage.
-- Redis is used only for processed result caching.
+- Redis is used for caching processed results.
 - PostgreSQL stores metadata only.
