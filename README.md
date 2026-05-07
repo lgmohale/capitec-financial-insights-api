@@ -371,8 +371,8 @@ Troubleshooting:
 Run unit tests locally or inside Docker:
 
 ```bash
-pytest tests/unit -q --cov=app --cov-report=term-missing
-docker compose exec api pytest tests/unit -q --cov=app --cov-report=term-missing
+pytest tests/unit -q --cov=app --cov-report=term-missing --cov-report=xml
+docker compose exec api pytest tests/unit -q --cov=app --cov-report=term-missing --cov-report=xml
 ```
 
 Run integration tests with Docker Compose services:
@@ -431,7 +431,7 @@ After branch-flow validation passes, CI runs separate jobs:
 ```bash
 ruff check .
 ruff format --check .
-pytest tests/unit -q --cov=app --cov-report=term-missing
+pytest tests/unit -q --cov=app --cov-report=term-missing --cov-report=xml
 docker compose config
 docker build -t transaction-aggregation-api:test .
 docker compose run --rm api pytest tests/integration -q
@@ -450,6 +450,7 @@ CI runs on pull requests and pushes to `dev`, `staging`, and `main`. It validate
 - Docker image build validation.
 - Docker-backed integration tests with PostgreSQL, Redis, and MinIO.
 - Advisory dependency security scanning with `pip-audit`.
+- SonarCloud static analysis using the Python coverage XML report.
 
 The expected branch flow is:
 
@@ -465,6 +466,18 @@ CD runs on pushes to `staging` and `main`.
 The CD workflow validates the Docker image and runs unit tests inside the built container. Actual cloud deployment is intentionally out of scope for this assessment.
 
 Docker Compose remains local-only. Staging and production image builds are validated in CI/CD, but a real deployment would inject managed service configuration through the target runtime.
+
+## SonarCloud Analysis
+
+SonarCloud static analysis is configured with `sonar-project.properties` for the Python API code in `app` and tests in `tests`. The scan excludes local virtual environments, migration files, local data folders, and Python cache folders.
+
+To enable analysis in GitHub Actions:
+
+1. Create or connect the project in SonarCloud.
+2. Add a repository secret named `SONAR_TOKEN` in GitHub under `Settings > Secrets and variables > Actions`.
+3. Use a token generated from SonarCloud with permission to analyse the project.
+
+CI generates `coverage.xml` from pytest, uploads it as an artifact, then runs the SonarCloud scan automatically after linting, formatting, unit tests, and integration tests pass. Reports are available in the SonarCloud dashboard for the `lgmohale/capitec-financial-insights-api` project.
 
 ## Assumptions
 
