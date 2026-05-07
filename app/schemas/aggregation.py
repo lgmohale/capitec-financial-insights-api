@@ -32,7 +32,7 @@ class AggregationResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "account_id": "550e8400-e29b-41d4-a716-446655440000",
+                "statement_id": "550e8400-e29b-41d4-a716-446655440000",
                 "cached": False,
                 "total_income": 46579.0,
                 "total_expenses": 15790.5,
@@ -80,15 +80,11 @@ class AggregationResponse(BaseModel):
                     "Net cashflow remained positive across all analysed months.",
                     "Gambling spend was detected in the analysed period.",
                 ],
-                "bank_statement_pdf_download_url": (
-                    "http://localhost:8000/api/v1/bank-statements/"
-                    "550e8400-e29b-41d4-a716-446655440000/download"
-                ),
             }
         }
     )
 
-    account_id: UUID
+    statement_id: UUID
     cached: bool
     total_income: float
     total_expenses: float
@@ -103,4 +99,3 @@ class AggregationResponse(BaseModel):
     monthly_summary: dict[str, MonthlySummaryItem]
     risk_flags: AggregationRiskFlags
     insights: list[str]
-    bank_statement_pdf_download_url: str = ""
