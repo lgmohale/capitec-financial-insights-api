@@ -3,6 +3,7 @@ fastapi==0.136.1
 httpx==0.28.1
 minio==7.2.12
 pre-commit==4.0.1
+prometheus-client==0.22.1
 psycopg[binary]==3.2.13
 pytest==9.0.3
 pytest-cov==6.0.0

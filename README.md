@@ -30,6 +30,7 @@ The system supports a simple financial insights workflow:
 - MinIO to simulate S3-style object storage for statement PDFs and generated JSON outputs
 - Environment-specific configuration for `local`, `staging`, and `production`
 - Docker Compose for local API, PostgreSQL, Redis, and MinIO services only
+- Prometheus for local API metrics scraping
 - Alembic for database migrations
 - Pytest, Ruff, pre-commit, and GitHub Actions for quality checks
 
@@ -309,6 +310,14 @@ http://localhost:9001
 
 Use `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` from `.env.example`. The default bucket is `bank-statements` and is created by the API when the first PDF or JSON output is uploaded.
 
+Open Prometheus:
+
+```text
+http://localhost:9090
+```
+
+Prometheus scrapes the API `/metrics` endpoint using `observability/prometheus.yml`.
+
 Stop the stack:
 
 ```bash
@@ -320,6 +329,36 @@ Open PostgreSQL from the terminal:
 ```bash
 docker compose exec postgres psql -U postgres -d financial_insights
 ```
+
+## Observability
+
+The local Docker Compose stack includes Prometheus only. Grafana is intentionally out of scope for this assessment.
+
+Available observability features:
+
+- `GET /metrics` exposes Prometheus metrics.
+- Prometheus UI is available at `http://localhost:9090`.
+- API responses include `X-Request-ID`.
+- Incoming `X-Request-ID` headers are reused; otherwise the API generates a UUID request ID.
+- Application logs are structured JSON and include request correlation fields where available.
+
+Metrics include:
+
+- `api_requests_total`
+- `api_request_duration_seconds`
+- `bank_statement_uploads_total`
+- `bank_statement_upload_failures_total`
+- `minio_uploads_total`
+- `minio_upload_failures_total`
+- `transaction_generation_completed_total`
+- `transaction_generation_failures_total`
+- `aggregation_completed_total`
+- `aggregation_failures_total`
+- `cache_hits_total`
+- `cache_misses_total`
+- `processing_failures_total`
+
+Structured logs are emitted for request start/completion, PDF uploads, MinIO uploads, simulated processing, transaction generation, aggregation, cache hit/miss events, and safe error handling. Logs do not include raw file contents, MinIO credentials, database URLs, tokens, or secrets.
 
 Troubleshooting:
 
