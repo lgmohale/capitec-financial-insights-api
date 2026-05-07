@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db.models import BankStatement, User
+from app.db.models import UploadedStatement
 from app.db.session import engine
 from app.storage.object_storage import (
     delete_object,
@@ -37,33 +37,30 @@ def test_minio_json_object_round_trip() -> None:
 
 
 def test_postgres_metadata_tables_are_available() -> None:
-    user_id = uuid4()
     statement_id = uuid4()
-    file_url = f"input/{user_id}/{statement_id}.pdf"
+    object_key = f"input/{statement_id}/statement.pdf"
 
     with Session(engine) as db:
-        db.add(User(id=user_id, name="Integration Test User"))
-        db.flush()
         db.add(
-            BankStatement(
+            UploadedStatement(
                 id=statement_id,
-                user_id=user_id,
                 bank_name="Integration Test Statement",
-                file_url=file_url,
+                object_key=object_key,
             )
         )
         db.commit()
 
         saved_statement = db.scalar(
-            select(BankStatement).where(BankStatement.id == statement_id)
+            select(UploadedStatement).where(UploadedStatement.id == statement_id)
         )
 
         assert saved_statement is not None
-        assert saved_statement.user_id == user_id
-        assert saved_statement.file_url == file_url
+        assert saved_statement.bank_name == "Integration Test Statement"
+        assert saved_statement.object_key == object_key
 
-        db.execute(delete(BankStatement).where(BankStatement.id == statement_id))
-        db.execute(delete(User).where(User.id == user_id))
+        db.execute(
+            delete(UploadedStatement).where(UploadedStatement.id == statement_id)
+        )
         db.commit()
 
 

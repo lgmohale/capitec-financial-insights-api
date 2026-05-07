@@ -18,19 +18,19 @@ MONEY_QUANTIZER = Decimal("0.01")
 logger = get_logger(__name__)
 
 
-def aggregate_account_transactions(
-    account_id: UUID,
+def aggregate_statement_transactions(
+    statement_id: UUID,
     force_refresh: bool = False,
 ) -> AggregationResponse:
     try:
         logger.info(
             "Aggregation started",
             extra={
-                "bank_statement_id": str(account_id),
+                "statement_id": str(statement_id),
                 "event_name": "aggregation_started",
             },
         )
-        cache_key = f"aggregation:{account_id}"
+        cache_key = f"aggregation:{statement_id}"
         if not force_refresh:
             cached_result = get_cache(cache_key)
             if cached_result is not None:
@@ -38,11 +38,11 @@ def aggregate_account_transactions(
                 AGGREGATION_COMPLETED.labels("aggregation_cache_hit").inc()
                 return AggregationResponse(**cached_result)
 
-        transactions = read_transactions(account_id)
+        transactions = read_transactions(statement_id)
         aggregation = build_aggregation(transactions)
-        write_aggregation_output(account_id, aggregation)
+        write_aggregation_output(statement_id, aggregation)
         result = AggregationResponse(
-            account_id=account_id,
+            statement_id=statement_id,
             cached=False,
             **aggregation,
         )
@@ -52,7 +52,7 @@ def aggregate_account_transactions(
         logger.info(
             "Aggregation completed",
             extra={
-                "bank_statement_id": str(account_id),
+                "statement_id": str(statement_id),
                 "event_name": "aggregation_completed",
             },
         )
@@ -62,7 +62,7 @@ def aggregate_account_transactions(
         logger.exception(
             "Aggregation failed",
             extra={
-                "bank_statement_id": str(account_id),
+                "statement_id": str(statement_id),
                 "event_name": "aggregation_failed",
             },
         )
@@ -254,12 +254,12 @@ def round_metric(value: float) -> float:
     )
 
 
-def write_aggregation_output(account_id: UUID, aggregation: dict) -> str:
-    object_key = processed_output_object_key(account_id, "aggregation")
+def write_aggregation_output(statement_id: UUID, aggregation: dict) -> str:
+    object_key = processed_output_object_key(statement_id, "aggregation")
     return upload_json_object(
         object_key=object_key,
         value={
-            "account_id": str(account_id),
+            "statement_id": str(statement_id),
             **aggregation,
         },
     )

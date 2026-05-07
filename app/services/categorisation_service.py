@@ -42,22 +42,22 @@ CATEGORIES = [
 ]
 
 
-def categorise_account_transactions(
-    account_id: UUID,
+def categorise_statement_transactions(
+    statement_id: UUID,
     force_refresh: bool = False,
 ) -> CategoriesResponse:
-    cache_key = f"categorisation:{account_id}"
+    cache_key = f"categorisation:{statement_id}"
     if not force_refresh:
         cached_result = get_cache(cache_key)
         if cached_result is not None:
             cached_result["cached"] = True
             return CategoriesResponse(**cached_result)
 
-    transactions = read_transactions(account_id)
+    transactions = read_transactions(statement_id)
     category_summary = build_category_summary(transactions)
-    write_category_output(account_id, category_summary)
+    write_category_output(statement_id, category_summary)
     result = CategoriesResponse(
-        account_id=account_id,
+        statement_id=statement_id,
         cached=False,
         category_summary=category_summary,
     )
@@ -67,13 +67,13 @@ def categorise_account_transactions(
     return result
 
 
-def read_transactions(account_id: UUID) -> list[dict]:
+def read_transactions(statement_id: UUID) -> list[dict]:
     try:
-        return read_starter_transactions(account_id)
+        return read_starter_transactions(statement_id)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Transaction object not found for bank statement: {account_id}",
+            detail=f"Transaction object not found for bank statement: {statement_id}",
         ) from exc
 
 
@@ -118,14 +118,14 @@ def categorise_transaction(transaction: dict) -> str:
 
 
 def write_category_output(
-    account_id: UUID,
+    statement_id: UUID,
     category_summary: list[dict],
 ) -> str:
-    object_key = processed_output_object_key(account_id, "categories")
+    object_key = processed_output_object_key(statement_id, "categories")
     return upload_json_object(
         object_key=object_key,
         value={
-            "account_id": str(account_id),
+            "statement_id": str(statement_id),
             "category_summary": category_summary,
         },
     )

@@ -2,10 +2,10 @@ from uuid import UUID
 
 from app.services import categorisation_service
 
-ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+STATEMENT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
-def test_categorise_account_transactions_builds_output_and_cache(
+def test_categorise_statement_transactions_builds_output_and_cache(
     monkeypatch,
 ) -> None:
     cached_values = {}
@@ -14,7 +14,7 @@ def test_categorise_account_transactions_builds_output_and_cache(
     monkeypatch.setattr(
         categorisation_service,
         "read_transactions",
-        lambda account_id: [
+        lambda statement_id: [
             {
                 "id": "txn-001",
                 "date": "2026-04-25",
@@ -50,7 +50,7 @@ def test_categorise_account_transactions_builds_output_and_cache(
         lambda key, value: cached_values.update({key: value}),
     )
 
-    response = categorisation_service.categorise_account_transactions(ACCOUNT_ID)
+    response = categorisation_service.categorise_statement_transactions(STATEMENT_ID)
     summary_by_category = {item.category: item for item in response.category_summary}
 
     assert response.cached is False
@@ -58,19 +58,18 @@ def test_categorise_account_transactions_builds_output_and_cache(
     assert summary_by_category["salary"].total_amount == 46579.0
     assert summary_by_category["groceries"].transaction_count == 1
     assert summary_by_category["groceries"].total_amount == 1240.5
-    assert cached_values[f"categorisation:{ACCOUNT_ID}"]["cached"] is False
+    assert cached_values[f"categorisation:{STATEMENT_ID}"]["cached"] is False
 
-    output_key = f"output/{ACCOUNT_ID}/categories.json"
-    assert response.bank_statement_pdf_download_url == ""
+    output_key = f"output/{STATEMENT_ID}/categories.json"
     assert output_key in uploaded_objects
 
 
-def test_categorise_account_transactions_returns_cached_result(monkeypatch) -> None:
+def test_categorise_statement_transactions_returns_cached_result(monkeypatch) -> None:
     monkeypatch.setattr(
         categorisation_service,
         "get_cache",
         lambda key: {
-            "account_id": str(ACCOUNT_ID),
+            "statement_id": str(STATEMENT_ID),
             "cached": False,
             "category_summary": [
                 {
@@ -79,16 +78,11 @@ def test_categorise_account_transactions_returns_cached_result(monkeypatch) -> N
                     "transaction_count": 1,
                 }
             ],
-            "bank_statement_pdf_download_url": (
-                f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
-            ),
         },
     )
 
-    response = categorisation_service.categorise_account_transactions(ACCOUNT_ID)
+    response = categorisation_service.categorise_statement_transactions(STATEMENT_ID)
 
     assert response.cached is True
     assert response.category_summary[0].category == "salary"
-    assert response.bank_statement_pdf_download_url == (
-        f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
-    )
+    assert response.statement_id == STATEMENT_ID

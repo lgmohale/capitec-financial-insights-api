@@ -1,4 +1,4 @@
-"""create metadata tables
+"""create bank statements metadata table
 
 Revision ID: 20260505_0001
 Revises:
@@ -22,9 +22,10 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.create_table(
-        "users",
+        "bank_statements",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("name", sa.String(), nullable=False),
+        sa.Column("bank_name", sa.String(), nullable=False),
+        sa.Column("object_key", sa.String(), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -42,4 +43,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("users")
+    op.drop_table("bank_statements")

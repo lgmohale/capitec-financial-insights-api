@@ -2,10 +2,10 @@ from uuid import UUID
 
 from app.services import aggregation_service, risk_service
 
-ACCOUNT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+STATEMENT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
-def test_score_account_risk_builds_explainable_result_and_cache(
+def test_score_statement_risk_builds_explainable_result_and_cache(
     monkeypatch,
 ) -> None:
     test_transactions = [
@@ -44,12 +44,12 @@ def test_score_account_risk_builds_explainable_result_and_cache(
     uploaded_objects = {}
 
     monkeypatch.setattr(
-        risk_service, "read_transactions", lambda account_id: test_transactions
+        risk_service, "read_transactions", lambda statement_id: test_transactions
     )
     monkeypatch.setattr(
         aggregation_service,
         "read_transactions",
-        lambda account_id: test_transactions,
+        lambda statement_id: test_transactions,
     )
     for service in (aggregation_service, risk_service):
         monkeypatch.setattr(
@@ -71,7 +71,7 @@ def test_score_account_risk_builds_explainable_result_and_cache(
         lambda key, value: cached_values.update({key: value}),
     )
 
-    response = risk_service.score_account_risk(ACCOUNT_ID)
+    response = risk_service.score_statement_risk(STATEMENT_ID)
 
     assert response.cached is False
     assert response.risk_score == 45
@@ -84,19 +84,18 @@ def test_score_account_risk_builds_explainable_result_and_cache(
     assert "Debt repayments exceed 40% of monthly income." in (
         response.risk_factors.triggered_rules
     )
-    assert cached_values[f"risk:{ACCOUNT_ID}"]["cached"] is False
+    assert cached_values[f"risk:{STATEMENT_ID}"]["cached"] is False
 
-    output_key = f"output/{ACCOUNT_ID}/risk.json"
-    assert response.bank_statement_pdf_download_url == ""
+    output_key = f"output/{STATEMENT_ID}/risk.json"
     assert output_key in uploaded_objects
 
 
-def test_score_account_risk_returns_cached_result(monkeypatch) -> None:
+def test_score_statement_risk_returns_cached_result(monkeypatch) -> None:
     monkeypatch.setattr(
         risk_service,
         "get_cache",
         lambda key: {
-            "account_id": str(ACCOUNT_ID),
+            "statement_id": str(STATEMENT_ID),
             "cached": False,
             "risk_score": 80,
             "risk_band": "HIGH_RISK",
@@ -113,17 +112,12 @@ def test_score_account_risk_returns_cached_result(monkeypatch) -> None:
                 "triggered_rules": ["Cached risk result."],
             },
             "recommendation": "Review manually.",
-            "bank_statement_pdf_download_url": (
-                f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
-            ),
         },
     )
 
-    response = risk_service.score_account_risk(ACCOUNT_ID)
+    response = risk_service.score_statement_risk(STATEMENT_ID)
 
     assert response.cached is True
     assert response.risk_score == 80
     assert response.risk_band == "HIGH_RISK"
-    assert response.bank_statement_pdf_download_url == (
-        f"http://testserver/api/v1/bank-statements/{ACCOUNT_ID}/download"
-    )
+    assert response.statement_id == STATEMENT_ID

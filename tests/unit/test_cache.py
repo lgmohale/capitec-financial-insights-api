@@ -27,13 +27,13 @@ def test_cache_helpers_use_json_serialization(monkeypatch) -> None:
     redis = FakeRedis()
     monkeypatch.setattr(cache, "get_redis_client", lambda: redis)
 
-    cache.set_cache("aggregation:account-id", {"total": 100})
+    cache.set_cache("aggregation:statement-id", {"total": 100})
 
-    assert redis.ttls["aggregation:account-id"] == cache.DEFAULT_TTL_SECONDS
-    assert json.loads(redis.values["aggregation:account-id"]) == {"total": 100}
-    assert cache.get_cache("aggregation:account-id") == {"total": 100}
+    assert redis.ttls["aggregation:statement-id"] == cache.DEFAULT_TTL_SECONDS
+    assert json.loads(redis.values["aggregation:statement-id"]) == {"total": 100}
+    assert cache.get_cache("aggregation:statement-id") == {"total": 100}
 
-    cache.delete_cache("aggregation:account-id")
+    cache.delete_cache("aggregation:statement-id")
 
-    assert redis.deleted_keys == ["aggregation:account-id"]
-    assert cache.get_cache("aggregation:account-id") is None
+    assert redis.deleted_keys == ["aggregation:statement-id"]
+    assert cache.get_cache("aggregation:statement-id") is None
