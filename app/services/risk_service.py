@@ -2,7 +2,7 @@ from uuid import UUID
 
 from app.core.cache import get_cache, set_cache
 from app.schemas.risk import RiskResponse
-from app.services.aggregation_service import aggregate_account_transactions
+from app.services.aggregation_service import aggregate_statement_transactions
 from app.services.categorisation_service import (
     categorise_transaction,
     read_transactions,
@@ -11,26 +11,26 @@ from app.storage.object_storage import upload_json_object
 from app.storage.transactions import processed_output_object_key
 
 
-def score_account_risk(
-    account_id: UUID,
+def score_statement_risk(
+    statement_id: UUID,
     force_refresh: bool = False,
 ) -> RiskResponse:
-    cache_key = f"risk:{account_id}"
+    cache_key = f"risk:{statement_id}"
     if not force_refresh:
         cached_result = get_cache(cache_key)
         if cached_result is not None:
             cached_result["cached"] = True
             return RiskResponse(**cached_result)
 
-    transactions = read_transactions(account_id)
-    aggregation = aggregate_account_transactions(
-        account_id=account_id,
+    transactions = read_transactions(statement_id)
+    aggregation = aggregate_statement_transactions(
+        statement_id=statement_id,
         force_refresh=force_refresh,
     )
     risk_result = build_risk_result(transactions, aggregation.model_dump(mode="json"))
-    write_risk_output(account_id, risk_result)
+    write_risk_output(statement_id, risk_result)
     result = RiskResponse(
-        account_id=account_id,
+        statement_id=statement_id,
         cached=False,
         **risk_result,
     )
@@ -199,12 +199,12 @@ def get_recommendation(risk_score: int) -> str:
     return "Low lending risk based on available transaction behaviour."
 
 
-def write_risk_output(account_id: UUID, risk_result: dict) -> str:
-    object_key = processed_output_object_key(account_id, "risk")
+def write_risk_output(statement_id: UUID, risk_result: dict) -> str:
+    object_key = processed_output_object_key(statement_id, "risk")
     return upload_json_object(
         object_key=object_key,
         value={
-            "account_id": str(account_id),
+            "statement_id": str(statement_id),
             **risk_result,
         },
     )

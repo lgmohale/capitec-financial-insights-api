@@ -21,8 +21,7 @@ class JsonFormatter(logging.Formatter):
             "path",
             "status_code",
             "duration_ms",
-            "user_id",
-            "bank_statement_id",
+            "statement_id",
             "event_name",
         ):
             value = getattr(record, field, None)
