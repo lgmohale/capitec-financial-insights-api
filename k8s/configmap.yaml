@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: transaction-aggregation-api-config
+  namespace: capitec-transaction-aggregation
+data:
+  APP_NAME: capitec-transaction-aggregation-api
+  APP_ENV: production
+  MINIO_ENDPOINT: s3.example.com
+  MINIO_PORT: "443"
+  MINIO_BUCKET: bank-statements
+  MINIO_USE_SSL: "true"

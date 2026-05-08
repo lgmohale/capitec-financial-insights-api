@@ -24,6 +24,14 @@ This project demonstrates a simplified transaction-processing workflow:
 - Docker Compose for local development
 - Alembic for database migrations
 
+## Kubernetes
+
+Kubernetes manifests are included under `/k8s` as a deployment reference for the FastAPI API container.
+
+Docker Compose is still used for local development. PostgreSQL, Redis, and MinIO/S3 are expected to be external services when using Kubernetes, configured through environment variables and secrets.
+
+Kubernetes is not required to run the project locally.
+
 ## Prerequisites
 
 - Docker
