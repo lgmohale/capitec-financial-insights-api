@@ -28,7 +28,7 @@ spec:
 
       containers:
         - name: api
-          image: dockerhub-username/capitec-transaction-aggregation-api:latest
+          image: lgmohale/capitec-transaction-aggregation-api:latest
           imagePullPolicy: IfNotPresent
 
           securityContext:

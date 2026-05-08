@@ -21,5 +21,13 @@ env/
 .coverage
 coverage.xml
 htmlcov/
-
 .DS_Store
+k8s/secret.yaml
+k8s/*secret*.yaml
+!k8s/secret.example.yaml
+
+*.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
