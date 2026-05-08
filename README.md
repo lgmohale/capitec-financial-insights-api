@@ -178,9 +178,10 @@ Example response:
 
 ## Run With Docker
 
-Start the API, PostgreSQL, Redis, MinIO, and Prometheus:
+Copy `.env.example` to `.env`, then start the API, PostgreSQL, Redis, MinIO, and Prometheus:
 
 ```bash
+cp .env.example .env
 docker compose up --build -d
 ```
 
@@ -343,3 +344,14 @@ coverage.xml
 - MinIO simulates S3-compatible object storage.
 - Redis is used for caching processed results.
 - PostgreSQL stores metadata only.
+
+## Possible Improvements
+
+- Real OCR extraction from uploaded statements
+- Background processing with workers or queues
+- Authentication and authorization
+- Improved categorisation rules
+- More advanced risk analysis
+- Real S3 deployment
+- Distributed tracing and alerting
+- Rate limiting and API security
