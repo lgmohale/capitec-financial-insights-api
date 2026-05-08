@@ -21,5 +21,5 @@ env/
 .coverage
 coverage.xml
 htmlcov/
-
 .DS_Store
+k8s/secret.yaml

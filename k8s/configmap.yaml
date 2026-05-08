@@ -5,8 +5,8 @@ metadata:
   namespace: capitec-transaction-aggregation
 data:
   APP_NAME: capitec-transaction-aggregation-api
-  APP_ENV: production
-  MINIO_ENDPOINT: s3.example.com
-  MINIO_PORT: "443"
+  APP_ENV: local
+  MINIO_ENDPOINT: minio
+  MINIO_PORT: "9000"
   MINIO_BUCKET: bank-statements
-  MINIO_USE_SSL: "true"
+  MINIO_USE_SSL: "false"
